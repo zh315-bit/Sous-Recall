@@ -81,6 +81,13 @@
                inset -4px -4px 0 0 var(--butter-d), 6px 6px 0 0 rgba(59,36,24,.35);
   }
   .btn:hover { filter:brightness(1.05); }
+  .btn .pxicon { width:24px; height:auto; vertical-align:-3px; margin-right:10px; }
+  .btn:hover .pxicon { transform:translateY(-2px); }
+  #gestureBtn.active .i-hand { color:var(--sage-d); animation:wave 1.2s steps(2) infinite; transform-origin:50% 90%; }
+  @keyframes wave { 50% { transform:rotate(-12deg); } }
+  /* pixel focus ring instead of the browser's blue one (keyboard only) */
+  .btn:focus { outline:none; }
+  .btn:focus-visible { outline:3px dashed var(--tomato); outline-offset:6px; }
   .btn:active { transform:translate(4px,4px); box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), inset 4px 4px 0 0 var(--butter-d); }
   .btn:disabled { opacity:.5; cursor:wait; }
   .topbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -406,9 +413,9 @@
   </div>
 
   <div class="topbar">
-    <label class="btn" id="pickBtn" for="photo">📷 Snap your fridge</label>
-    <button class="btn ghost on" id="resetBtn">↺ Reset session</button>
-    <button class="btn ghost on" id="gestureBtn">✋ Gestures: off</button>
+    <label class="btn" id="pickBtn" for="photo"><svg class="pxicon i-camera" viewBox="0 0 14 11" shape-rendering="crispEdges" aria-hidden="true"><rect x="4" y="0" width="4" height="1" fill="currentColor"/><rect x="2" y="1" width="11" height="1" fill="currentColor"/><rect x="1" y="2" width="10" height="1" fill="currentColor"/><rect x="11" y="2" width="1" height="1" fill="#fffaf0"/><rect x="12" y="2" width="2" height="1" fill="currentColor"/><rect x="0" y="3" width="5" height="1" fill="currentColor"/><rect x="5" y="3" width="4" height="1" fill="#fffaf0"/><rect x="9" y="3" width="5" height="1" fill="currentColor"/><rect x="0" y="4" width="4" height="1" fill="currentColor"/><rect x="4" y="4" width="1" height="1" fill="#fffaf0"/><rect x="5" y="4" width="4" height="1" fill="currentColor"/><rect x="9" y="4" width="1" height="1" fill="#fffaf0"/><rect x="10" y="4" width="4" height="1" fill="currentColor"/><rect x="0" y="5" width="3" height="1" fill="currentColor"/><rect x="3" y="5" width="1" height="1" fill="#fffaf0"/><rect x="4" y="5" width="2" height="1" fill="currentColor"/><rect x="6" y="5" width="2" height="1" fill="#fffaf0"/><rect x="8" y="5" width="2" height="1" fill="currentColor"/><rect x="10" y="5" width="1" height="1" fill="#fffaf0"/><rect x="11" y="5" width="3" height="1" fill="currentColor"/><rect x="0" y="6" width="3" height="1" fill="currentColor"/><rect x="3" y="6" width="1" height="1" fill="#fffaf0"/><rect x="4" y="6" width="2" height="1" fill="currentColor"/><rect x="6" y="6" width="1" height="1" fill="#fffaf0"/><rect x="7" y="6" width="3" height="1" fill="currentColor"/><rect x="10" y="6" width="1" height="1" fill="#fffaf0"/><rect x="11" y="6" width="3" height="1" fill="currentColor"/><rect x="0" y="7" width="3" height="1" fill="currentColor"/><rect x="3" y="7" width="1" height="1" fill="#fffaf0"/><rect x="4" y="7" width="6" height="1" fill="currentColor"/><rect x="10" y="7" width="1" height="1" fill="#fffaf0"/><rect x="11" y="7" width="3" height="1" fill="currentColor"/><rect x="0" y="8" width="4" height="1" fill="currentColor"/><rect x="4" y="8" width="1" height="1" fill="#fffaf0"/><rect x="5" y="8" width="4" height="1" fill="currentColor"/><rect x="9" y="8" width="1" height="1" fill="#fffaf0"/><rect x="10" y="8" width="4" height="1" fill="currentColor"/><rect x="0" y="9" width="5" height="1" fill="currentColor"/><rect x="5" y="9" width="4" height="1" fill="#fffaf0"/><rect x="9" y="9" width="5" height="1" fill="currentColor"/><rect x="1" y="10" width="12" height="1" fill="currentColor"/></svg>Snap your fridge</label>
+    <button class="btn ghost on" id="resetBtn"><svg class="pxicon i-reset" viewBox="0 0 14 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="4" y="0" width="5" height="1" fill="currentColor"/><rect x="2" y="1" width="9" height="1" fill="currentColor"/><rect x="12" y="1" width="1" height="1" fill="currentColor"/><rect x="1" y="2" width="3" height="1" fill="currentColor"/><rect x="9" y="2" width="4" height="1" fill="currentColor"/><rect x="1" y="3" width="2" height="1" fill="currentColor"/><rect x="10" y="3" width="3" height="1" fill="currentColor"/><rect x="0" y="4" width="2" height="1" fill="currentColor"/><rect x="9" y="4" width="4" height="1" fill="currentColor"/><rect x="0" y="5" width="2" height="1" fill="currentColor"/><rect x="0" y="6" width="2" height="1" fill="currentColor"/><rect x="12" y="6" width="2" height="1" fill="currentColor"/><rect x="0" y="7" width="2" height="1" fill="currentColor"/><rect x="12" y="7" width="2" height="1" fill="currentColor"/><rect x="1" y="8" width="2" height="1" fill="currentColor"/><rect x="11" y="8" width="2" height="1" fill="currentColor"/><rect x="1" y="9" width="3" height="1" fill="currentColor"/><rect x="10" y="9" width="3" height="1" fill="currentColor"/><rect x="2" y="10" width="10" height="1" fill="currentColor"/><rect x="4" y="11" width="6" height="1" fill="currentColor"/></svg>Reset session</button>
+    <button class="btn ghost on" id="gestureBtn"><svg class="pxicon i-hand" viewBox="0 0 14 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="6" y="0" width="2" height="1" fill="currentColor"/><rect x="3" y="1" width="2" height="1" fill="currentColor"/><rect x="6" y="1" width="2" height="1" fill="currentColor"/><rect x="9" y="1" width="2" height="1" fill="currentColor"/><rect x="3" y="2" width="2" height="1" fill="currentColor"/><rect x="6" y="2" width="2" height="1" fill="currentColor"/><rect x="9" y="2" width="2" height="1" fill="currentColor"/><rect x="3" y="3" width="2" height="1" fill="currentColor"/><rect x="6" y="3" width="2" height="1" fill="currentColor"/><rect x="9" y="3" width="2" height="1" fill="currentColor"/><rect x="12" y="3" width="2" height="1" fill="currentColor"/><rect x="3" y="4" width="2" height="1" fill="currentColor"/><rect x="6" y="4" width="2" height="1" fill="currentColor"/><rect x="9" y="4" width="2" height="1" fill="currentColor"/><rect x="12" y="4" width="2" height="1" fill="currentColor"/><rect x="3" y="5" width="11" height="1" fill="currentColor"/><rect x="0" y="6" width="2" height="1" fill="currentColor"/><rect x="3" y="6" width="11" height="1" fill="currentColor"/><rect x="0" y="7" width="13" height="1" fill="currentColor"/><rect x="1" y="8" width="12" height="1" fill="currentColor"/><rect x="2" y="9" width="10" height="1" fill="currentColor"/><rect x="3" y="10" width="9" height="1" fill="currentColor"/><rect x="4" y="11" width="7" height="1" fill="currentColor"/></svg><span id="gestureLabel">Gestures: off</span></button>
   </div>
   <input type="file" id="photo" accept="image/*" capture="environment">
   <div id="previewWrap"><img id="preview" hidden alt=""></div>
@@ -1142,7 +1149,7 @@ async function startGestures() {
     await $("camVideo").play();
     camOn = true;
     document.body.classList.add("cam-on");
-    $("gestureBtn").textContent = "✋ Gestures: on";
+    $("gestureLabel").textContent = "Gestures: on"; $("gestureBtn").classList.add("active");
     requestAnimationFrame(onFrame);
   } catch (err) {
     stopGestures();
@@ -1156,7 +1163,7 @@ function stopGestures() {
   camStream = null;
   $("cam").classList.remove("on");
   document.body.classList.remove("cam-on");
-  $("gestureBtn").textContent = "✋ Gestures: off";
+  $("gestureLabel").textContent = "Gestures: off"; $("gestureBtn").classList.remove("active");
 }
 
 $("gestureBtn").addEventListener("click", () => (camOn ? stopGestures() : startGestures()));

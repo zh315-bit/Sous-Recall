@@ -156,22 +156,41 @@ def check_preferences(preferences: str, content: str) -> dict:
     return _parse_json("".join(b.text for b in resp.content if b.type == "text"))
 
 
+def _image_block(image_bytes: bytes, media_type: str) -> dict:
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": media_type, "data": base64.standard_b64encode(image_bytes).decode()},
+    }
+
+
 def generate_recipe(image_bytes: bytes, media_type: str, preferences: str = "none") -> dict:
     messages = [
         {
             "role": "user",
             "content": [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": base64.standard_b64encode(image_bytes).decode(),
-                    },
-                },
+                _image_block(image_bytes, media_type),
                 {"type": "text", "text": "Here is my fridge. What should I cook?"},
             ],
         }
     ]
     system = RECIPE_PROMPT.format(preferences=preferences)
     return _call_json(system, messages, required=("dish", "steps"))
+
+
+# Foods the UI has a pixel character for (static/index.html CREW); anything else is ignored.
+FRIDGE_ITEMS = ("tomato", "carrot", "broccoli", "egg", "cheese", "milk", "lemon", "onion", "garlic", "bell_pepper",
+                "chili", "lettuce", "chicken", "mushroom", "corn", "potato", "butter", "apple", "orange", "peach",
+                "strawberry", "banana", "watermelon", "avocado", "pineapple", "eggplant", "steak", "fish", "sausage")
+FRIDGE_PROMPT = (
+    "List the foods clearly visible in this fridge photo, using ONLY these ids: " + ", ".join(FRIDGE_ITEMS) + ". "
+    "Vegetables and fruit first, then everything else; at most 12, no duplicates. Return ONLY JSON: {\"items\": [str]}"
+)
+
+
+def detect_items(image_bytes: bytes, media_type: str) -> list[str]:
+    """Fast vision pass (CHAT_MODEL) for the fridge characters shown while the recipe is being made."""
+    messages = [{"role": "user", "content": [_image_block(image_bytes, media_type),
+                                             {"type": "text", "text": "What's in my fridge?"}]}]
+    data = _call_json(FRIDGE_PROMPT, messages, required=(), model=CHAT_MODEL)
+    items = data.get("items") if isinstance(data.get("items"), list) else []
+    return list(dict.fromkeys(i for i in items if i in FRIDGE_ITEMS))[:12]

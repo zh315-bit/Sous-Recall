@@ -33,6 +33,7 @@ else:
 tracer = trace.get_tracer("handsfree-chef")
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile  # noqa: E402
+from fastapi.concurrency import run_in_threadpool  # noqa: E402
 from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
 from urllib.parse import quote  # noqa: E402
 
@@ -165,9 +166,27 @@ async def create_recipe(bg: BackgroundTasks, image: UploadFile = File(...)):
             span.set_attribute("mode", "onboarding")
             span.set_attribute("output.value", ONBOARD_Q)
             return {"needs_onboarding": True, "reply": ONBOARD_Q, "audio_url": tts_url(ONBOARD_Q)}
-        result = make_recipe(bg, span, data, media_type)
+        # in a thread: a blocking LLM call here would also hold up the parallel /fridge request
+        result = await run_in_threadpool(make_recipe, bg, span, data, media_type)
         intro = f"Let's make {result['dish']}. Step one: {result['steps'][0]}"
         return {**result, "intro": intro, "audio_url": tts_url(intro)}
+
+
+@app.post("/fridge")
+def fridge_items(image: UploadFile = File(...)):
+    """Foods visible in the photo, for the pixel 'fridge crew'. Sync, so it runs in the threadpool next to /recipe."""
+    with tracer.start_as_current_span("fridge_items") as span:
+        span.set_attribute("openinference.span.kind", "CHAIN")
+        data = image.file.read()
+        if not data:
+            raise HTTPException(400, "Empty image")
+        try:
+            items = llm.detect_items(data, image.content_type or "image/jpeg")
+        except Exception as e:
+            span.record_exception(e)
+            raise HTTPException(502, f"Item detection failed: {e}")
+        span.set_attribute("output.value", json.dumps(items))
+        return {"items": items}
 
 
 def onboarding_turn(bg: BackgroundTasks, span, transcript: str) -> dict:

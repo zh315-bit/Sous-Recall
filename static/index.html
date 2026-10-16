@@ -178,7 +178,7 @@
   #steps li.current::before { background:var(--tomato); color:var(--cream); }
 
   #chat { display:flex; flex-direction:column; gap:18px; padding:0 4px; }
-  .bubble { max-width:85%; padding:12px 18px; font-size:22px; position:relative; margin:4px 8px; }
+  .bubble { max-width:85%; padding:12px 18px; font-size:22px; position:relative; margin:4px 8px; scroll-margin-bottom:190px; }
   .bubble.bot { align-self:flex-start; background:var(--cream); }
   .bubble.user { align-self:flex-end; background:#d9efc7; }
   .bubble.bot::after, .bubble.user::after { content:""; position:absolute; bottom:-16px; width:12px; height:12px; background:inherit; box-shadow:4px 0 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink); }
@@ -800,6 +800,11 @@ function startOrbWave() {
 }
 const idle = () => vstatus(onboarding ? "Hold the button (or Space) to answer" : "Hold the button (or Space) and talk");
 
+// every new reply: bring the newest message into view (clear of the voice orb at the bottom)
+function scrollChatToEnd() {
+  setTimeout(() => $("chat").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "end" }), 30);
+}
+
 function addBubble(who, text, pref, evalId) {
   if (!text) return;
   $("convo").style.display = "block";
@@ -868,7 +873,6 @@ async function sendAudio() {
     if (onboarding) $("previewWrap").classList.add("scanning");  // the waiting photo is being cooked now
     const data = await api("/talk", { method: "POST", body: fd });
     if (mySession !== session) return;  // session was reset while thinking
-    const nearBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 160;
     addBubble("user", data.transcript || "(nothing heard)");
     if (data.recipe) {  // onboarding answered: the waiting photo is now a recipe
       setOnboarding(false);
@@ -881,8 +885,7 @@ async function sendAudio() {
       addBubble("bot", data.reply, data.new_preference, data.eval_id);
       if (recipe && data.current_step !== currentStep) { currentStep = data.current_step; render(); }
     }
-    // follow the chat only if the user is already at the bottom; otherwise don't move the page
-    if (nearBottom) $("chat").lastChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!data.recipe) scrollChatToEnd();  // a brand-new recipe keeps the step card in view instead
     if (data.finished) celebrate(data.audio_url || data.audio_base64); else playAudio(data.audio_url || data.audio_base64);
     refreshMemory();
     if (data.new_preference) [3000, 8000].forEach((ms) => setTimeout(refreshMemory, ms));  // saved in the background
@@ -1087,6 +1090,7 @@ async function gestureNext() {
     addBubble("user", "👌 (next step)");
     addBubble("bot", data.reply);
     if (data.current_step !== currentStep) { currentStep = data.current_step; render(); }
+    scrollChatToEnd();
     if (data.finished) celebrate(data.audio_url || data.audio_base64); else playAudio(data.audio_url || data.audio_base64);
   } catch (err) { idle(); toast(err.message); }
   finally { busy = false; $("talkBtn").disabled = false; }

@@ -1,0 +1,13 @@
+# secrets: never commit real keys (copy .env.example instead)
+.env
+
+# local runtime state
+memory.json
+.venv/
+__pycache__/
+*.pyc
+
+# OS / editor / local assistant files
+.DS_Store
+CLAUDE.md
+AGENTS.md

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+anthropic
+elevenlabs
+arize-otel
+openinference-instrumentation-anthropic

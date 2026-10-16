@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sous Recall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:#3b2418; --wood:#7a4a2a; --paper:#fff6e3; --paper2:#fbe9c6; --muted:#8a6a52;
+    --tomato:#e2553b; --tomato-d:#a83a26; --butter:#f6c453; --butter-d:#c9962c;
+    --sage:#9cc27a; --sage-d:#5f8a45; --sky:#8fd0dc; --cream:#fffaf0;
+    --pixel:'Press Start 2P', monospace; --body:'Pixelify Sans', 'Courier New', monospace;
+  }
+  * { box-sizing:border-box; }
+  html { image-rendering:pixelated; }
+  body {
+    margin:0; color:var(--ink); font-family:var(--body); font-size:24px; line-height:1.45;
+    background-color:#f7e6c8;
+  }
+  /* ---------- breathing background: drifting warm light + faint pixel grid + floating motes ---------- */
+  #bg { position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none;
+    background:linear-gradient(160deg, #fbecd2 0%, #f7e2c2 55%, #f3d9b6 100%); }
+  #bg .glow { position:absolute; width:75vmax; height:75vmax; border-radius:50%; will-change:transform, opacity;
+    background:radial-gradient(circle, var(--c) 0%, transparent 62%); animation:drift var(--t) ease-in-out infinite alternate, breatheBg 8s ease-in-out infinite; }
+  #bg .g1 { --c:rgba(240,138,111,.42); --t:26s; left:-25vmax; top:-30vmax; }
+  #bg .g2 { --c:rgba(246,196,83,.40); --t:31s; right:-30vmax; top:-15vmax; animation-delay:-6s, -2s; }
+  #bg .g3 { --c:rgba(156,194,122,.30); --t:23s; left:-10vmax; bottom:-40vmax; animation-delay:-11s, -4s; }
+  #bg .g4 { --c:rgba(226,85,59,.22); --t:35s; right:-20vmax; bottom:-35vmax; animation-delay:-3s, -6s; }
+  @keyframes drift { 0% { transform:translate(0, 0) scale(1); } 50% { transform:translate(8vmax, 6vmax) scale(1.12); } 100% { transform:translate(-6vmax, 10vmax) scale(.95); } }
+  @keyframes breatheBg { 0%, 100% { opacity:.75; } 50% { opacity:1; } }
+  /* faint pixel dot grid keeps the retro texture */
+  #bg::after { content:""; position:absolute; inset:0;
+    background-image:radial-gradient(rgba(122,74,42,.13) 1.2px, transparent 1.6px); background-size:16px 16px; }
+  #bg .mote { position:absolute; bottom:-12px; width:var(--s); height:var(--s); background:var(--c); left:var(--x); opacity:0;
+    box-shadow:0 0 0 1px rgba(59,36,24,.08); animation:rise var(--t) linear infinite; animation-delay:var(--d); }
+  @keyframes rise { 0% { transform:translateY(0); opacity:0; } 10% { opacity:.75; } 50% { opacity:.35; } 60% { opacity:.7; } 90% { opacity:.5; }
+    100% { transform:translate(var(--dx), -105vh); opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { #bg .glow, #bg .mote { animation:none; } #bg .mote { display:none; } }
+  main { max-width:900px; margin:0 auto; padding:24px 20px 80px; }
+  #side { display:none; }
+  /* cooking layout: ingredients + steps pinned on the left, current step + chat on the right */
+  body.has-recipe main { max-width:1440px; display:grid; grid-template-columns:minmax(340px, 440px) minmax(0, 1fr);
+    grid-template-areas:"head head" "side top" "side convo"; column-gap:36px; align-items:start; }
+  body.has-recipe #head { grid-area:head; } body.has-recipe #mainCol { grid-area:top; } body.has-recipe #convo { grid-area:convo; }
+  body.has-recipe #side { display:block; grid-area:side; position:sticky; top:12px; max-height:calc(100vh - 150px); overflow-y:auto; padding:0 8px 12px 0; scrollbar-width:thin; }
+  body.has-recipe #side h2:first-child { margin-top:12px; }
+  body.has-recipe #side #ingredients { columns:1; font-size:20px; padding:12px 18px; }
+  body.has-recipe #side #ingredients li { margin:2px 0; }
+  body.has-recipe #side #steps li { font-size:19px; padding:12px 14px 12px 64px; margin:12px 4px; }
+  body.has-recipe #side #steps li::before { left:12px; top:10px; width:34px; height:34px; line-height:34px; font-size:18px; }
+  body.has-recipe #preview { max-height:140px; }
+  body.has-recipe #dish { margin-top:12px; }
+  body.has-recipe #now { margin-top:20px; }
+
+  /* pixel box: notched corners via 4 offset shadows + hard drop shadow */
+  .px {
+    background:var(--paper); border:0; margin:4px;
+    box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink),
+               8px 8px 0 0 rgba(59,36,24,.35);
+  }
+
+  header { display:flex; align-items:center; gap:18px; margin:8px 4px 24px; }
+  header svg { width:84px; height:84px; flex:none; }
+  h1 { font-family:var(--body); font-weight:700; font-size:30px; line-height:1.35; margin:0; color:var(--ink); text-shadow:3px 3px 0 var(--butter); }
+  h1 span { color:var(--tomato); }
+  .tagline { font-size:20px; color:var(--wood); margin-top:6px; }
+  .steam rect { animation:steam 1.2s steps(2) infinite; }
+  .steam rect:nth-child(2) { animation-delay:.4s; } .steam rect:nth-child(3) { animation-delay:.8s; }
+  @keyframes steam { 0%{opacity:1; transform:translateY(0)} 50%{opacity:.2; transform:translateY(-4px)} 100%{opacity:1; transform:translateY(0)} }
+
+  h2 { font-family:var(--body); font-weight:700; font-size:26px; margin:36px 4px 14px; color:var(--wood); }
+  h2::before { content:"▶ "; color:var(--tomato); }
+
+  .btn {
+    display:inline-block; font-family:var(--body); font-weight:700; font-size:22px; line-height:1.3; padding:12px 20px; margin:4px 12px 4px 4px;
+    background:var(--butter); color:var(--ink); border:0; cursor:pointer; user-select:none;
+    box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink),
+               inset -4px -4px 0 0 var(--butter-d), 6px 6px 0 0 rgba(59,36,24,.35);
+  }
+  .btn:hover { filter:brightness(1.05); }
+  .btn:active { transform:translate(4px,4px); box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), inset 4px 4px 0 0 var(--butter-d); }
+  .btn:disabled { opacity:.5; cursor:wait; }
+  .topbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .btn.ghost { background:var(--cream); display:none; box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), inset -4px -4px 0 0 var(--paper2), 6px 6px 0 0 rgba(59,36,24,.35); }
+  .btn.ghost.on { display:inline-block; }
+  input[type=file] { display:none; }
+
+  #preview { display:block; max-width:min(100%,420px); max-height:240px; margin:20px 4px 0; border:4px solid var(--ink); box-shadow:6px 6px 0 rgba(59,36,24,.35); }
+  #preview[hidden] { display:none; }
+  /* scanning line over the photo while the recipe is being made */
+  #previewWrap { position:relative; display:inline-block; vertical-align:top; }
+  #previewWrap #preview { margin:20px 4px 0; }
+  #previewWrap.scanning::after { content:""; position:absolute; left:8px; right:8px; top:24px; height:10px;
+    background:repeating-linear-gradient(90deg, var(--butter) 0 8px, #fff3c4 8px 16px); box-shadow:0 0 0 3px var(--ink), 0 0 18px 6px rgba(246,196,83,.55);
+    animation:scan 1.6s steps(16) infinite alternate; }
+  #previewWrap.scanning #preview { filter:saturate(.75) brightness(1.04); }
+  @keyframes scan { to { top:calc(100% - 14px); } }
+  /* "Found it!" banner between recognition and cooking */
+  .found { display:inline-block; font-weight:700; font-size:26px; padding:8px 16px; background:var(--butter);
+    box-shadow:0 0 0 4px var(--ink), 6px 6px 0 4px rgba(59,36,24,.35); animation:pop .45s steps(5) both; }
+  /* entrance once the cooking layout appears (staggered via --i) */
+  body.entering #side { animation:slideLeft .55s steps(8) both; }
+  body.entering #side li { animation:dropIn .35s steps(5) both; animation-delay:calc(.25s + var(--i, 0) * .05s); }
+  body.entering #dish, body.entering #why, body.entering #recipeBadge { animation:dropIn .4s steps(5) both; animation-delay:.1s; }
+  body.entering #now { animation:pop .5s steps(6) both; animation-delay:.2s; }
+  @keyframes slideLeft { from { transform:translateX(-60px); opacity:0; } }
+  @keyframes dropIn { from { transform:translateY(-14px); opacity:0; } }
+  /* view transition: header and memory card glide to their new places */
+  #head { view-transition-name:head; } #mem { view-transition-name:mem; }
+  ::view-transition-group(*) { animation-duration:.55s; animation-timing-function:cubic-bezier(.3,.9,.3,1); }
+  ::view-transition-old(root) { animation:.3s ease both vtFadeOut; }
+  ::view-transition-new(root) { animation:.45s ease .1s both vtFadeIn; }
+  @keyframes vtFadeOut { to { opacity:0; } } @keyframes vtFadeIn { from { opacity:0; } }
+  @media (prefers-reduced-motion: reduce) {
+    body.entering *, #previewWrap.scanning::after, .found { animation:none !important; }
+    ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; }
+  }
+  #status { font-size:24px; margin:18px 4px 0; color:var(--wood); min-height:36px; }
+  #status.error { color:var(--tomato-d); }
+  .spinner { display:inline-block; width:16px; height:16px; margin-right:56px; vertical-align:middle; background:var(--tomato);
+    box-shadow:20px 0 0 var(--butter), 40px 0 0 var(--sage); animation:blink .9s steps(3) infinite; }
+  @keyframes blink { 0%{background:var(--tomato)} 33%{background:var(--butter)} 66%{background:var(--sage)} }
+
+  /* memory card = little notepad */
+  #mem { padding:18px 22px; margin-top:28px; font-size:21px;
+    background:repeating-linear-gradient(var(--paper) 0 31px, #f1d9ae 31px 33px); }
+  #mem h3 { font-family:var(--body); font-weight:700; margin:0 0 10px; font-size:22px; line-height:1.4; color:var(--tomato-d); }
+  #mem h3 small { font-family:var(--body); color:var(--muted); font-weight:400; font-size:16px; }
+  #mem ul { margin:0; padding:0; list-style:none; }
+  #mem li { padding-left:26px; position:relative; }
+  #mem li::before { content:""; position:absolute; left:2px; top:12px; width:10px; height:10px; background:var(--sage-d); }
+  #mem li.old { color:var(--muted); text-decoration:line-through; text-decoration-thickness:3px; }
+  #mem li.old::before { background:#c8b49a; }
+  #mem li time { color:var(--muted); font-size:15px; margin-left:8px; text-decoration:none; display:inline-block; }
+  #mem .empty { color:var(--muted); }
+  #mem .empty::before { display:none; }
+
+  #mem .diners { margin:-4px 0 12px; font-size:18px; color:var(--wood); }
+  .chip { display:inline-block; font-family:var(--body); font-weight:700; font-size:17px; padding:2px 10px; margin:4px 8px 4px 2px; background:var(--butter); box-shadow:0 0 0 3px var(--ink); }
+  #mem .person { font-family:var(--body); font-weight:700; font-size:20px; color:var(--ink); margin:14px 0 6px; }
+  #mem .person:first-child { margin-top:0; }
+  #mem .person .tonight { font-family:var(--body); font-size:15px; color:var(--sage-d); margin-left:6px; }
+  .badge { display:inline-block; font-size:16px; font-weight:600; padding:3px 10px; margin-top:10px; box-shadow:0 0 0 3px var(--ink); background:var(--paper2); color:var(--muted); }
+  .badge.pass { background:#dcefc9; color:var(--sage-d); }
+  .badge.fail { background:#ffd9cf; color:var(--tomato-d); }
+  .bubble .badge { display:table; font-size:14px; margin-top:10px; }
+  #recipeBadge { margin:12px 4px 0; }
+  #convo { display:none; }
+  #recipe { display:none; }
+  #dish { font-family:var(--body); font-weight:700; font-size:40px; line-height:1.2; color:var(--tomato-d); text-shadow:2px 2px 0 var(--butter); margin:36px 4px 8px; }
+  #why { color:var(--wood); font-size:22px; margin:0 4px; }
+
+  /* current step = big recipe card */
+  #now { padding:24px 28px 28px; margin:28px 4px 12px; scroll-margin-top:20px; background:var(--cream);
+    box-shadow:0 -6px 0 0 var(--ink), 0 6px 0 0 var(--ink), -6px 0 0 0 var(--ink), 6px 0 0 0 var(--ink),
+               inset 0 8px 0 0 var(--butter), 10px 10px 0 0 rgba(59,36,24,.35); }
+  #nowLabel { font-family:var(--body); font-weight:700; font-size:22px; color:var(--tomato-d); margin-top:6px; }
+  #progress { height:20px; margin:14px 0 20px; background:var(--paper2); border:4px solid var(--ink); }
+  #progressFill { height:100%; width:0; transition:width .4s steps(6);
+    background:repeating-linear-gradient(90deg, var(--sage) 0 14px, var(--sage-d) 14px 18px); }
+  #nowText { font-size:48px; font-weight:600; line-height:1.25; }
+  #nowText.done { color:var(--sage-d); }
+  #doneBtn { margin-top:18px; background:var(--sage); }
+  #doneBtn[hidden] { display:none; }
+
+  #ingredients { columns:2; column-gap:32px; padding:16px 22px 16px 22px; list-style:none; }
+  #ingredients li { margin:4px 0; break-inside:avoid; padding-left:26px; position:relative; }
+  #ingredients li::before { content:""; position:absolute; left:0; top:12px; width:12px; height:12px; background:var(--butter); box-shadow:0 0 0 3px var(--ink); }
+
+  #steps { list-style:none; padding:0; margin:0; counter-reset:s; }
+  #steps li { counter-increment:s; padding:16px 20px 16px 78px; margin:16px 4px; position:relative; font-size:24px; color:var(--muted); }
+  #steps li::before { content:counter(s); position:absolute; left:16px; top:12px; width:40px; height:40px; font-family:var(--pixel); font-size:16px;
+    background:var(--paper2); color:var(--ink); text-align:center; line-height:40px; box-shadow:0 0 0 4px var(--ink); }
+  #steps li.current { color:var(--ink); background:#fff3c4; font-weight:600; }
+  #steps li.current::before { background:var(--tomato); color:var(--cream); }
+
+  #chat { display:flex; flex-direction:column; gap:18px; padding:0 4px; }
+  .bubble { max-width:85%; padding:12px 18px; font-size:22px; position:relative; margin:4px 8px; }
+  .bubble.bot { align-self:flex-start; background:var(--cream); }
+  .bubble.user { align-self:flex-end; background:#d9efc7; }
+  .bubble.bot::after, .bubble.user::after { content:""; position:absolute; bottom:-16px; width:12px; height:12px; background:inherit; box-shadow:4px 0 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink); }
+  .bubble.bot::after { left:18px; } .bubble.user::after { right:18px; }
+  .bubble .pref { display:block; margin-top:8px; font-size:17px; color:var(--tomato-d); font-weight:600; }
+
+  main.cooking { padding-bottom:180px; }
+  #talkBar { display:none; position:fixed; left:0; right:0; bottom:0; padding:22px 16px 16px; text-align:center; pointer-events:none;
+    background:linear-gradient(to top, rgba(247,230,200,.96) 0 45%, rgba(247,230,200,.7) 70%, rgba(247,230,200,0)); }
+  #talkBar > * { pointer-events:auto; }
+  #talkBar.on { display:block; }
+  #vstatus { display:inline-block; font-family:var(--body); font-weight:700; font-size:17px; min-height:24px; margin-bottom:10px; padding:2px 12px;
+    color:var(--wood); background:rgba(255,250,240,.85); border-radius:12px; }
+  #vstatus.listening { color:var(--tomato-d); } #vstatus.thinking { color:#a8740f; } #vstatus.speaking { color:#2f7f8f; }
+  #vstatus.thinking::after { content:"..."; animation:dots 1s steps(4) infinite; display:inline-block; width:0; overflow:hidden; vertical-align:bottom; }
+  @keyframes dots { to { width:3ch; } }
+  /* ---------- voice orb: breathing ball -> liquid bar while recording -> back to a ball ---------- */
+  #talkBtn { --lvl:0; position:relative; display:block; margin:0 auto; width:84px; height:84px; padding:0; border:0; border-radius:42px;
+    overflow:hidden; cursor:pointer; color:var(--cream); isolation:isolate;
+    background:radial-gradient(circle at 34% 28%, #ffe1c2 0 7%, #f6a07f 24%, #e2553b 55%, #a83a26 100%);
+    box-shadow:0 0 0 4px var(--ink), 0 0 0 0 rgba(246,196,83,.55), 4px 5px 0 4px rgba(59,36,24,.18);
+    user-select:none; -webkit-user-select:none; touch-action:none; -webkit-touch-callout:none;
+    transition:width .6s cubic-bezier(.34,1.56,.64,1), height .6s cubic-bezier(.34,1.56,.64,1), border-radius .6s cubic-bezier(.34,1.56,.64,1), filter .3s;
+    animation:breathe 3.2s ease-in-out infinite; }
+  @keyframes breathe {
+    0%, 100% { transform:scale(1); box-shadow:0 0 0 4px var(--ink), 0 0 0 0 rgba(240,138,111,.45), 4px 5px 0 4px rgba(59,36,24,.18); }
+    50% { transform:scale(1.07); box-shadow:0 0 0 4px var(--ink), 0 0 0 16px rgba(240,138,111,0), 4px 5px 0 4px rgba(59,36,24,.18); } }
+  /* liquid surface: two soft blobs slowly swirling inside the orb */
+  #talkBtn::before, #talkBtn::after { content:""; position:absolute; z-index:-1; width:150%; height:150%; left:-25%; top:-70%;
+    border-radius:42% 46% 44% 48%; background:rgba(255,236,214,.22); animation:swirl 7s linear infinite; }
+  #talkBtn::after { top:-82%; left:-35%; background:rgba(255,255,255,.14); border-radius:46% 40% 48% 42%; animation-duration:11s; animation-direction:reverse; }
+  @keyframes swirl { to { transform:rotate(360deg); } }
+  #talkBtn .orbIcon { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:4px;
+    transition:opacity .2s, transform .3s; pointer-events:none; }
+  #talkBtn .orbIcon i { display:block; width:5px; height:var(--h); border-radius:3px; background:var(--cream);
+    box-shadow:0 1px 0 rgba(168,58,38,.35); animation:bars 1.6s ease-in-out infinite; animation-delay:var(--d); }
+  @keyframes bars { 0%, 100% { transform:scaleY(1); } 50% { transform:scaleY(.55); } }
+  #talkBtn[data-state="thinking"] .orbIcon i { animation-duration:.6s; }
+  #orbWave { position:absolute; inset:0; width:100%; height:100%; opacity:0; transition:opacity .25s .15s; pointer-events:none; }
+  /* recording: stretch into a liquid bar that reacts to your voice */
+  #talkBtn.rec { width:min(440px, 100%); height:58px; border-radius:29px; animation:goo .7s ease-out 1;
+    background:radial-gradient(120% 160% at 30% 20%, #ffe1c2 0 6%, #f6a07f 22%, #e2553b 55%, #a83a26 100%);
+    box-shadow:0 0 0 4px var(--ink), 0 0 calc(8px + var(--lvl) * 30px) calc(var(--lvl) * 10px) rgba(246,196,83,.55), 4px 5px 0 4px rgba(59,36,24,.18); }
+  #talkBtn.rec::before { animation-duration:2.2s; } #talkBtn.rec::after { animation-duration:3.4s; }
+  #talkBtn.rec .orbIcon { opacity:0; transform:scale(.4); }
+  #talkBtn.rec #orbWave { opacity:1; }
+  @keyframes goo { 0% { transform:scale(1.05, .9); } 35% { transform:scale(.97, 1.12); } 60% { transform:scale(1.02, .95); } 100% { transform:scale(1); } }
+  #talkBtn.back { animation:gooBack .7s ease-out 1, breathe 3.2s ease-in-out .7s infinite; }
+  @keyframes gooBack { 0% { transform:scale(.88, 1.12); } 40% { transform:scale(1.1, .92); } 70% { transform:scale(.97, 1.04); } 100% { transform:scale(1); } }
+  /* thinking: liquid swirls fast; speaking: ripples spread out */
+  #talkBtn[data-state="thinking"]::before { animation-duration:1.1s; } #talkBtn[data-state="thinking"]::after { animation-duration:1.6s; }
+  #talkBtn[data-state="thinking"] { animation:breathe 1.2s ease-in-out infinite; filter:saturate(1.15); }
+  #talkBtn[data-state="speaking"] { animation:ripple 1.1s ease-out infinite; }
+  @keyframes ripple {
+    0% { box-shadow:0 0 0 4px var(--ink), 0 0 0 0 rgba(143,208,220,.7), 4px 5px 0 4px rgba(59,36,24,.18); }
+    100% { box-shadow:0 0 0 4px var(--ink), 0 0 0 22px rgba(143,208,220,0), 4px 5px 0 4px rgba(59,36,24,.18); } }
+  #talkBtn:disabled { cursor:wait; }
+  #talkBtn:focus-visible { outline:3px dashed var(--butter); outline-offset:8px; }
+  @media (prefers-reduced-motion: reduce) { #talkBtn, #talkBtn::before, #talkBtn::after { animation:none !important; transition:none; } }
+  #hint { display:none; margin-top:8px; font-weight:700; font-size:17px; color:var(--tomato-d); animation:blinkhint 1s steps(2) infinite; }
+  #hint.on { display:block; }
+  @keyframes blinkhint { 50% { opacity:.45; } }
+  /* ---------- pixel kitchen scene (pot follows the recipe, chef shows voice state) ---------- */
+  #kitchen { position:relative; margin:4px 4px 22px; overflow:hidden;
+    box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), 8px 8px 0 0 rgba(59,36,24,.35);
+    background-color:#fbe9c6;
+    background-image:linear-gradient(to bottom, transparent 0 72.2%, #3b2418 72.2% 75%, #9a643d 75% 100%),
+      repeating-linear-gradient(90deg, rgba(232,203,156,.8) 0 3px, transparent 3px 44px),
+      repeating-linear-gradient(0deg, rgba(232,203,156,.8) 0 3px, transparent 3px 44px); }
+  #kitchenStage { position:relative; width:min(100%, 760px); aspect-ratio:120 / 36; margin:0 auto; }
+  #kitchenSvg { display:block; width:100%; height:100%; overflow:visible; }
+  .k-flame, .k-steam, .k-knife, .c-eyes-up, .c-mouth-open, .c-mouth-smile, .c-arm-ear, .c-arm-up, .c-stir { display:none; }
+  #kitchen[data-mode="heat"] .k-flame, #kitchen[data-mode="heat"] .k-steam, #kitchen[data-mode="done"] .k-steam { display:inline; }
+  .k-flameA { animation:flickA .4s steps(1) infinite; } .k-flameB { animation:flickB .4s steps(1) infinite; }
+  @keyframes flickA { 50% { opacity:0; } } @keyframes flickB { 0% { opacity:0; } 50% { opacity:1; } }
+  .k-steam { animation:steamUp 1.2s steps(3) infinite; }
+  @keyframes steamUp { 0% { transform:translateY(1px); opacity:.9; } 100% { transform:translateY(-2px); opacity:.25; } }
+  #kitchen[data-mode="prep"] .k-knife { display:inline; animation:chop .5s steps(2) infinite; }
+  @keyframes chop { 50% { transform:translateY(-3px); } }
+  .k-chef { animation:chefBob 1.6s steps(2) infinite; }
+  @keyframes chefBob { 50% { transform:translateY(-1px); } }
+  .c-eyes { animation:blink 4s steps(1) infinite; }
+  @keyframes blink { 96% { opacity:0; } }
+  #kitchen[data-chef="listening"] .c-arm-r { display:none; }
+  #kitchen[data-chef="listening"] .c-arm-ear { display:inline; }
+  #kitchen[data-chef="thinking"] .c-eyes { display:none; }
+  #kitchen[data-chef="thinking"] .c-eyes-up { display:inline; }
+  #kitchen[data-chef="speaking"] .c-mouth-open { display:inline; animation:talk .32s steps(1) infinite; }
+  @keyframes talk { 50% { opacity:0; } }
+  #kitchen[data-mode="heat"][data-chef="idle"] .c-arm-r, #kitchen[data-mode="heat"][data-chef="speaking"] .c-arm-r { display:none; }
+  #kitchen[data-mode="heat"][data-chef="idle"] .c-stir, #kitchen[data-mode="heat"][data-chef="speaking"] .c-stir { display:inline; }
+  .c-stirA { animation:flickA .6s steps(1) infinite; } .c-stirB { animation:flickB .6s steps(1) infinite; }
+  #kitchen[data-chef="celebrate"] .c-arm-l, #kitchen[data-chef="celebrate"] .c-arm-r, #kitchen[data-chef="celebrate"] .c-mouth-closed { display:none; }
+  #kitchen[data-chef="celebrate"] .c-arm-up, #kitchen[data-chef="celebrate"] .c-mouth-smile { display:inline; }
+  #kitchen[data-chef="celebrate"] .k-chef { animation:hop .5s steps(2) infinite; }
+  @keyframes hop { 50% { transform:translateY(-3px); } }
+  #chefBubble { position:absolute; left:1.5%; top:6%; max-width:27%; padding:6px 10px; font-weight:700; font-size:15px; line-height:1.25;
+    background:var(--cream); color:var(--ink); box-shadow:0 0 0 3px var(--ink), 4px 4px 0 3px rgba(59,36,24,.3); animation:pop .35s steps(4) both; }
+  #chefBubble::after { content:""; position:absolute; right:-9px; bottom:8px; width:6px; height:6px; background:var(--cream);
+    box-shadow:3px 0 0 var(--ink), 0 3px 0 var(--ink), 0 -3px 0 var(--ink); }
+  #chefBubble[hidden] { display:none; }
+  body.has-recipe #kitchenStage { width:min(100%, 560px); }
+  body.has-recipe #kitchen { margin-bottom:16px; }
+  @media (max-width:600px) { #chefBubble { font-size:11px; padding:3px 6px; max-width:30%; } #kitchen { margin-bottom:16px; } }
+  @media (prefers-reduced-motion: reduce) { #kitchen * { animation:none !important; } }
+
+  /* ---------- finish celebration ---------- */
+  #finish { display:none; position:fixed; inset:0; z-index:20; align-items:center; justify-content:center; padding:16px;
+    background:rgba(59,36,24,.72); background-image:radial-gradient(circle at 50% 45%, rgba(246,196,83,.35), transparent 60%); }
+  #finish.on { display:flex; }
+  #finishCard { width:min(560px, 100%); padding:26px 26px 22px; text-align:center; background:var(--cream); position:relative;
+    animation:pop .5s steps(5) both; }
+  @keyframes pop { 0% { transform:scale(.2); opacity:0 } 60% { transform:scale(1.08); opacity:1 } 100% { transform:scale(1) } }
+  #finishCard svg.plate { width:220px; max-width:60%; height:auto; display:block; margin:0 auto 6px; animation:bob 1.2s steps(2) infinite; }
+  @keyframes bob { 50% { transform:translateY(-6px) } }
+  .plate .steam rect { animation:steam 1.2s steps(2) infinite; }
+  .plate .steam rect:nth-child(2) { animation-delay:.4s } .plate .steam rect:nth-child(3) { animation-delay:.8s }
+  .spark { position:absolute; width:12px; height:12px; background:var(--butter); animation:twinkle 1s steps(2) infinite;
+    box-shadow:0 0 0 3px var(--ink); }
+  .spark::before, .spark::after { content:""; position:absolute; background:var(--butter); }
+  .spark::before { left:4px; top:-8px; width:4px; height:28px; } .spark::after { top:4px; left:-8px; width:28px; height:4px; }
+  @keyframes twinkle { 50% { opacity:.15; transform:scale(.6) } }
+  #finishTitle { font-family:var(--pixel); font-size:30px; line-height:1.3; color:var(--tomato); text-shadow:3px 3px 0 var(--butter), 6px 6px 0 var(--ink); margin:8px 0 10px; }
+  #finishDish { font-weight:700; font-size:24px; }
+  #finishStats { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; margin:16px 0 18px; }
+  #finishStats span { font-weight:700; font-size:18px; padding:6px 12px; background:var(--paper2); box-shadow:0 0 0 3px var(--ink); }
+  #finishCard .btn { margin:6px; }
+  #finishHint { font-size:15px; color:var(--muted); margin-top:6px; }
+  .confetti { position:fixed; top:-20px; z-index:21; pointer-events:none; animation:fall linear forwards; }
+  @keyframes fall { to { transform:translate(var(--dx), 110vh) rotate(var(--rot)); } }
+  @media (max-width:600px) { #finishTitle { font-size:20px; } #finishDish { font-size:20px; } #finishStats span { font-size:15px; } }
+
+  /* gesture camera: lives in the bottom-left corner of the talk bar so it never covers content */
+  #cam { display:none; position:absolute; left:14px; bottom:10px; align-items:center; gap:10px; padding:6px 10px 6px 6px;
+    background:var(--cream); text-align:left; }
+  #cam.on { display:flex; }
+  #cam video { display:block; width:128px; height:96px; object-fit:cover; transform:scaleX(-1); background:#2b1d14; border:3px solid var(--ink); }
+  #camInfo { width:170px; }
+  #camLabel { font-weight:700; font-size:16px; min-height:22px; }
+  #camLabel.fire { color:var(--tomato-d); }
+  #cam .legend { font-size:13px; color:var(--wood); line-height:1.35; }
+  #camBar { height:6px; background:var(--paper2); margin:3px 0 4px; }
+  #camBarFill { height:100%; width:0; background:var(--sage-d); }
+  /* narrower screens: shrink the cam and keep the talk button clear of it */
+  @media (max-width:1100px) {
+    #cam .legend { display:none; } #camInfo { width:110px; }
+    body.cam-on #talkBar { padding-left:290px; }
+  }
+  @media (max-width:760px) {
+    #cam { left:8px; bottom:8px; padding:4px; }
+    #cam video { width:80px; height:60px; border-width:2px; }
+    #camInfo { position:absolute; left:4px; right:4px; bottom:4px; width:auto; background:rgba(59,36,24,.75); padding:1px 3px; }
+    #camLabel { font-size:11px; min-height:0; color:var(--cream); } #camBar { margin:1px 0 0; height:3px; }
+    body.cam-on #talkBar { padding-left:104px; }
+  }
+  #forgetBtn { position:absolute; right:10px; top:6px; font-family:var(--body); font-size:13px; color:var(--muted); background:none; border:0; padding:4px 6px; cursor:pointer; opacity:.6; }
+  #forgetBtn:hover { opacity:1; text-decoration:underline; }
+
+  #toast { position:fixed; top:16px; left:50%; transform:translate(-50%,-200%); max-width:min(92vw,720px); z-index:10; cursor:pointer;
+    background:var(--tomato); color:var(--cream); font-size:20px; font-weight:600; padding:14px 20px; transition:transform .25s steps(4);
+    box-shadow:0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink), 6px 6px 0 rgba(59,36,24,.4); }
+  #toast.show { transform:translate(-50%,0); }
+
+  @media (max-width:980px) {
+    body.has-recipe main { max-width:900px; grid-template-columns:minmax(0, 1fr); grid-template-areas:"head" "top" "side" "convo"; }
+    body.has-recipe #side { position:static; max-height:none; overflow:visible; }
+  }
+  @media (max-width:600px) {
+    body { font-size:20px; }
+    header svg { width:60px; height:60px; } h1 { font-size:20px; } .tagline { font-size:16px; }
+    .btn { font-size:18px; padding:10px 14px; }
+    #dish { font-size:30px; } #nowText { font-size:30px; } #nowLabel { font-size:18px; }
+    #ingredients { columns:1; } #steps li { font-size:20px; } h2 { font-size:22px; }
+    body.has-recipe main { display:block; }
+    body.has-recipe #side { position:static; max-height:none; overflow:visible; padding:0; }
+    #talkBtn { width:70px; height:70px; } #talkBtn .orbIcon { gap:3px; transform:scale(.85); } #talkBtn.rec { height:52px; }
+    #vstatus { font-size:16px; } main.cooking { padding-bottom:150px; }
+    #toast { font-size:17px; }
+  }
+</style>
+</head>
+<body>
+<div id="bg" aria-hidden="true">
+  <i class="glow g1"></i><i class="glow g2"></i><i class="glow g3"></i><i class="glow g4"></i>
+  <i class="mote" style="--x:6%;--s:6px;--c:#f6c453;--t:19s;--d:-2s;--dx:20px"></i>
+  <i class="mote" style="--x:14%;--s:4px;--c:#f08a6f;--t:24s;--d:-9s;--dx:-30px"></i>
+  <i class="mote" style="--x:23%;--s:8px;--c:#fffaf0;--t:21s;--d:-15s;--dx:25px"></i>
+  <i class="mote" style="--x:31%;--s:4px;--c:#9cc27a;--t:27s;--d:-5s;--dx:-15px"></i>
+  <i class="mote" style="--x:42%;--s:6px;--c:#f6c453;--t:23s;--d:-18s;--dx:35px"></i>
+  <i class="mote" style="--x:51%;--s:4px;--c:#fffaf0;--t:20s;--d:-11s;--dx:-25px"></i>
+  <i class="mote" style="--x:60%;--s:8px;--c:#f08a6f;--t:29s;--d:-3s;--dx:15px"></i>
+  <i class="mote" style="--x:68%;--s:4px;--c:#f6c453;--t:22s;--d:-13s;--dx:-35px"></i>
+  <i class="mote" style="--x:76%;--s:6px;--c:#9cc27a;--t:26s;--d:-7s;--dx:25px"></i>
+  <i class="mote" style="--x:84%;--s:4px;--c:#fffaf0;--t:18s;--d:-16s;--dx:-20px"></i>
+  <i class="mote" style="--x:91%;--s:6px;--c:#f08a6f;--t:25s;--d:-1s;--dx:30px"></i>
+  <i class="mote" style="--x:97%;--s:4px;--c:#f6c453;--t:21s;--d:-10s;--dx:-15px"></i>
+</div>
+<main class="cooking">
+ <div id="head">
+  <header>
+    <svg viewBox="0 0 21 21" shape-rendering="crispEdges" aria-hidden="true">
+      <g class="steam" fill="#c9d6dc"><rect x="6" y="1" width="2" height="3"/><rect x="10" y="0" width="2" height="3"/><rect x="14" y="1" width="2" height="3"/></g>
+      <rect x="2" y="7" width="17" height="2" fill="#3b2418"/>
+      <rect x="8" y="5" width="5" height="2" fill="#3b2418"/><rect x="9" y="6" width="3" height="1" fill="#f6c453"/>
+      <rect x="3" y="8" width="15" height="1" fill="#f08a6f"/>
+      <rect x="0" y="10" width="3" height="2" fill="#3b2418"/><rect x="18" y="10" width="3" height="2" fill="#3b2418"/>
+      <rect x="3" y="9" width="15" height="9" fill="#3b2418"/>
+      <rect x="4" y="9" width="13" height="8" fill="#e2553b"/>
+      <rect x="4" y="9" width="13" height="2" fill="#f08a6f"/>
+      <rect x="14" y="11" width="2" height="5" fill="#a83a26"/>
+      <rect x="6" y="12" width="2" height="2" fill="#fff6e3"/>
+      <rect x="4" y="18" width="13" height="1" fill="#3b2418"/>
+    </svg>
+    <div>
+      <h1>Sous <span>Recall</span></h1>
+      <div class="tagline">Snap your fridge, then cook by voice.</div>
+    </div>
+  </header>
+
+  <div id="kitchen" data-mode="empty" data-chef="idle">
+    <div id="kitchenStage">
+      <svg id="kitchenSvg" viewBox="0 0 120 36" shape-rendering="crispEdges" aria-hidden="true"><g class="k-bg"><rect x="2" y="3" width="22" height="1" fill="#3b2418"/><rect x="2" y="4" width="1" height="1" fill="#3b2418"/><rect x="3" y="4" width="9" height="1" fill="#bfe3ec"/><rect x="12" y="4" width="1" height="1" fill="#3b2418"/><rect x="13" y="4" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="4" width="1" height="1" fill="#3b2418"/><rect x="2" y="5" width="1" height="1" fill="#3b2418"/><rect x="3" y="5" width="1" height="1" fill="#bfe3ec"/><rect x="4" y="5" width="1" height="1" fill="#e8f6fa"/><rect x="5" y="5" width="2" height="1" fill="#bfe3ec"/><rect x="7" y="5" width="2" height="1" fill="#f6c453"/><rect x="9" y="5" width="3" height="1" fill="#bfe3ec"/><rect x="12" y="5" width="1" height="1" fill="#3b2418"/><rect x="13" y="5" width="6" height="1" fill="#bfe3ec"/><rect x="19" y="5" width="2" height="1" fill="#e8f6fa"/><rect x="21" y="5" width="2" height="1" fill="#bfe3ec"/><rect x="23" y="5" width="1" height="1" fill="#3b2418"/><rect x="2" y="6" width="1" height="1" fill="#3b2418"/><rect x="3" y="6" width="1" height="1" fill="#bfe3ec"/><rect x="4" y="6" width="1" height="1" fill="#e8f6fa"/><rect x="5" y="6" width="1" height="1" fill="#bfe3ec"/><rect x="6" y="6" width="4" height="1" fill="#f6c453"/><rect x="10" y="6" width="2" height="1" fill="#bfe3ec"/><rect x="12" y="6" width="1" height="1" fill="#3b2418"/><rect x="13" y="6" width="5" height="1" fill="#bfe3ec"/><rect x="18" y="6" width="4" height="1" fill="#e8f6fa"/><rect x="22" y="6" width="1" height="1" fill="#bfe3ec"/><rect x="23" y="6" width="1" height="1" fill="#3b2418"/><rect x="2" y="7" width="1" height="1" fill="#3b2418"/><rect x="3" y="7" width="3" height="1" fill="#bfe3ec"/><rect x="6" y="7" width="4" height="1" fill="#f6c453"/><rect x="10" y="7" width="2" height="1" fill="#bfe3ec"/><rect x="12" y="7" width="1" height="1" fill="#3b2418"/><rect x="13" y="7" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="7" width="1" height="1" fill="#3b2418"/><rect x="2" y="8" width="1" height="1" fill="#3b2418"/><rect x="3" y="8" width="4" height="1" fill="#bfe3ec"/><rect x="7" y="8" width="2" height="1" fill="#f6c453"/><rect x="9" y="8" width="3" height="1" fill="#bfe3ec"/><rect x="12" y="8" width="1" height="1" fill="#3b2418"/><rect x="13" y="8" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="8" width="1" height="1" fill="#3b2418"/><rect x="2" y="9" width="22" height="1" fill="#3b2418"/><rect x="2" y="10" width="1" height="1" fill="#3b2418"/><rect x="3" y="10" width="9" height="1" fill="#bfe3ec"/><rect x="12" y="10" width="1" height="1" fill="#3b2418"/><rect x="13" y="10" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="10" width="1" height="1" fill="#3b2418"/><rect x="2" y="11" width="1" height="1" fill="#3b2418"/><rect x="3" y="11" width="9" height="1" fill="#bfe3ec"/><rect x="12" y="11" width="1" height="1" fill="#3b2418"/><rect x="13" y="11" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="11" width="1" height="1" fill="#3b2418"/><rect x="2" y="12" width="1" height="1" fill="#3b2418"/><rect x="3" y="12" width="9" height="1" fill="#bfe3ec"/><rect x="12" y="12" width="1" height="1" fill="#3b2418"/><rect x="13" y="12" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="12" width="1" height="1" fill="#3b2418"/><rect x="2" y="13" width="1" height="1" fill="#3b2418"/><rect x="3" y="13" width="9" height="1" fill="#bfe3ec"/><rect x="12" y="13" width="1" height="1" fill="#3b2418"/><rect x="13" y="13" width="10" height="1" fill="#bfe3ec"/><rect x="23" y="13" width="1" height="1" fill="#3b2418"/><rect x="2" y="14" width="22" height="1" fill="#3b2418"/><rect x="7" y="10" width="1" height="1" fill="#9cc27a"/><rect x="9" y="10" width="1" height="1" fill="#9cc27a"/><rect x="6" y="11" width="1" height="1" fill="#9cc27a"/><rect x="7" y="11" width="1" height="1" fill="#5f8a45"/><rect x="8" y="11" width="1" height="1" fill="#9cc27a"/><rect x="9" y="11" width="1" height="1" fill="#5f8a45"/><rect x="10" y="11" width="1" height="1" fill="#9cc27a"/><rect x="7" y="12" width="1" height="1" fill="#9cc27a"/><rect x="8" y="12" width="1" height="1" fill="#5f8a45"/><rect x="9" y="12" width="1" height="1" fill="#9cc27a"/><rect x="5" y="13" width="7" height="1" fill="#3b2418"/><rect x="5" y="14" width="1" height="1" fill="#3b2418"/><rect x="6" y="14" width="5" height="1" fill="#e2553b"/><rect x="11" y="14" width="1" height="1" fill="#3b2418"/><rect x="1" y="15" width="24" height="1" fill="#3b2418"/><rect x="1" y="16" width="1" height="1" fill="#3b2418"/><rect x="2" y="16" width="22" height="1" fill="#7a4a2a"/><rect x="24" y="16" width="1" height="1" fill="#3b2418"/><rect x="1" y="17" width="24" height="1" fill="#3b2418"/><rect x="105" y="4" width="3" height="1" fill="#3b2418"/><rect x="105" y="5" width="1" height="1" fill="#3b2418"/><rect x="106" y="5" width="1" height="1" fill="#f6c453"/><rect x="107" y="5" width="1" height="1" fill="#3b2418"/><rect x="110" y="5" width="4" height="1" fill="#3b2418"/><rect x="104" y="6" width="1" height="1" fill="#3b2418"/><rect x="105" y="6" width="3" height="1" fill="#f6c453"/><rect x="108" y="6" width="1" height="1" fill="#3b2418"/><rect x="110" y="6" width="1" height="1" fill="#3b2418"/><rect x="111" y="6" width="2" height="1" fill="#9cc27a"/><rect x="113" y="6" width="1" height="1" fill="#3b2418"/><rect x="115" y="6" width="2" height="1" fill="#3b2418"/><rect x="104" y="7" width="1" height="1" fill="#3b2418"/><rect x="105" y="7" width="3" height="1" fill="#f6c453"/><rect x="108" y="7" width="1" height="1" fill="#3b2418"/><rect x="110" y="7" width="1" height="1" fill="#3b2418"/><rect x="111" y="7" width="2" height="1" fill="#9cc27a"/><rect x="113" y="7" width="1" height="1" fill="#3b2418"/><rect x="115" y="7" width="1" height="1" fill="#3b2418"/><rect x="116" y="7" width="1" height="1" fill="#bfe3ec"/><rect x="117" y="7" width="1" height="1" fill="#3b2418"/><rect x="104" y="8" width="1" height="1" fill="#3b2418"/><rect x="105" y="8" width="3" height="1" fill="#f6c453"/><rect x="108" y="8" width="1" height="1" fill="#3b2418"/><rect x="110" y="8" width="1" height="1" fill="#3b2418"/><rect x="111" y="8" width="2" height="1" fill="#9cc27a"/><rect x="113" y="8" width="1" height="1" fill="#3b2418"/><rect x="115" y="8" width="1" height="1" fill="#3b2418"/><rect x="116" y="8" width="1" height="1" fill="#bfe3ec"/><rect x="117" y="8" width="1" height="1" fill="#3b2418"/><rect x="103" y="9" width="16" height="1" fill="#3b2418"/><rect x="103" y="10" width="1" height="1" fill="#3b2418"/><rect x="104" y="10" width="14" height="1" fill="#7a4a2a"/><rect x="118" y="10" width="1" height="1" fill="#3b2418"/><rect x="103" y="11" width="16" height="1" fill="#3b2418"/><rect x="105" y="12" width="1" height="1" fill="#3b2418"/><rect x="116" y="12" width="1" height="1" fill="#3b2418"/><rect x="82" y="2" width="1" height="1" fill="#3b2418"/><rect x="82" y="3" width="1" height="1" fill="#9aa6ab"/><rect x="82" y="4" width="1" height="1" fill="#9aa6ab"/><rect x="82" y="5" width="1" height="1" fill="#9aa6ab"/><rect x="82" y="6" width="1" height="1" fill="#9aa6ab"/><rect x="81" y="7" width="1" height="1" fill="#3b2418"/><rect x="82" y="7" width="1" height="1" fill="#d7dde0"/><rect x="83" y="7" width="1" height="1" fill="#3b2418"/><rect x="81" y="8" width="1" height="1" fill="#3b2418"/><rect x="82" y="8" width="1" height="1" fill="#d7dde0"/><rect x="83" y="8" width="1" height="1" fill="#3b2418"/><rect x="82" y="9" width="1" height="1" fill="#3b2418"/></g><g class="k-counter"><rect x="0" y="26" width="120" height="1" fill="#3b2418"/><rect x="0" y="27" width="120" height="9" fill="#9a643d"/><rect x="9" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="21" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="33" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="45" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="57" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="69" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="81" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="93" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="105" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="117" y="27" width="1" height="9" fill="#7a4a2a"/><rect x="0" y="27" width="120" height="1" fill="#b57a4c"/><rect x="49" y="26" width="30" height="1" fill="#3b2418"/><rect x="49" y="27" width="1" height="1" fill="#3b2418"/><rect x="50" y="27" width="28" height="1" fill="#4a3b33"/><rect x="78" y="27" width="1" height="1" fill="#3b2418"/><rect x="49" y="28" width="1" height="1" fill="#3b2418"/><rect x="50" y="28" width="1" height="1" fill="#4a3b33"/><rect x="51" y="28" width="1" height="1" fill="#f6c453"/><rect x="52" y="28" width="3" height="1" fill="#4a3b33"/><rect x="55" y="28" width="1" height="1" fill="#f6c453"/><rect x="56" y="28" width="15" height="1" fill="#4a3b33"/><rect x="71" y="28" width="1" height="1" fill="#f6c453"/><rect x="72" y="28" width="3" height="1" fill="#4a3b33"/><rect x="75" y="28" width="1" height="1" fill="#f6c453"/><rect x="76" y="28" width="2" height="1" fill="#4a3b33"/><rect x="78" y="28" width="1" height="1" fill="#3b2418"/><rect x="49" y="29" width="1" height="1" fill="#3b2418"/><rect x="50" y="29" width="28" height="1" fill="#4a3b33"/><rect x="78" y="29" width="1" height="1" fill="#3b2418"/><rect x="49" y="30" width="1" height="1" fill="#3b2418"/><rect x="50" y="30" width="2" height="1" fill="#4a3b33"/><rect x="52" y="30" width="24" height="1" fill="#3b2418"/><rect x="76" y="30" width="2" height="1" fill="#4a3b33"/><rect x="78" y="30" width="1" height="1" fill="#3b2418"/><rect x="49" y="31" width="1" height="1" fill="#3b2418"/><rect x="50" y="31" width="2" height="1" fill="#4a3b33"/><rect x="52" y="31" width="1" height="1" fill="#3b2418"/><rect x="53" y="31" width="22" height="1" fill="#2b1d14"/><rect x="75" y="31" width="1" height="1" fill="#3b2418"/><rect x="76" y="31" width="2" height="1" fill="#4a3b33"/><rect x="78" y="31" width="1" height="1" fill="#3b2418"/><rect x="49" y="32" width="1" height="1" fill="#3b2418"/><rect x="50" y="32" width="2" height="1" fill="#4a3b33"/><rect x="52" y="32" width="1" height="1" fill="#3b2418"/><rect x="53" y="32" width="9" height="1" fill="#2b1d14"/><rect x="62" y="32" width="2" height="1" fill="#f08a6f"/><rect x="64" y="32" width="11" height="1" fill="#2b1d14"/><rect x="75" y="32" width="1" height="1" fill="#3b2418"/><rect x="76" y="32" width="2" height="1" fill="#4a3b33"/><rect x="78" y="32" width="1" height="1" fill="#3b2418"/><rect x="49" y="33" width="1" height="1" fill="#3b2418"/><rect x="50" y="33" width="2" height="1" fill="#4a3b33"/><rect x="52" y="33" width="1" height="1" fill="#3b2418"/><rect x="53" y="33" width="22" height="1" fill="#2b1d14"/><rect x="75" y="33" width="1" height="1" fill="#3b2418"/><rect x="76" y="33" width="2" height="1" fill="#4a3b33"/><rect x="78" y="33" width="1" height="1" fill="#3b2418"/><rect x="49" y="34" width="1" height="1" fill="#3b2418"/><rect x="50" y="34" width="2" height="1" fill="#4a3b33"/><rect x="52" y="34" width="24" height="1" fill="#3b2418"/><rect x="76" y="34" width="2" height="1" fill="#4a3b33"/><rect x="78" y="34" width="1" height="1" fill="#3b2418"/><rect x="49" y="35" width="1" height="1" fill="#3b2418"/><rect x="50" y="35" width="28" height="1" fill="#4a3b33"/><rect x="78" y="35" width="1" height="1" fill="#3b2418"/><rect x="53" y="25" width="22" height="1" fill="#3b2418"/><rect x="55" y="24" width="18" height="1" fill="#4a3b33"/></g><g class="k-flame k-flameA"><rect x="54" y="22" width="1" height="1" fill="#f08a6f"/><rect x="61" y="22" width="1" height="1" fill="#f08a6f"/><rect x="67" y="22" width="1" height="1" fill="#f08a6f"/><rect x="73" y="22" width="1" height="1" fill="#f08a6f"/><rect x="53" y="23" width="1" height="1" fill="#f08a6f"/><rect x="54" y="23" width="1" height="1" fill="#f6c453"/><rect x="55" y="23" width="1" height="1" fill="#f08a6f"/><rect x="60" y="23" width="1" height="1" fill="#f08a6f"/><rect x="61" y="23" width="1" height="1" fill="#f6c453"/><rect x="62" y="23" width="1" height="1" fill="#f08a6f"/><rect x="66" y="23" width="1" height="1" fill="#f08a6f"/><rect x="67" y="23" width="1" height="1" fill="#f6c453"/><rect x="68" y="23" width="1" height="1" fill="#f08a6f"/><rect x="72" y="23" width="1" height="1" fill="#f08a6f"/><rect x="73" y="23" width="1" height="1" fill="#f6c453"/></g><g class="k-flame k-flameB"><rect x="56" y="22" width="1" height="1" fill="#f08a6f"/><rect x="62" y="22" width="1" height="1" fill="#f08a6f"/><rect x="69" y="22" width="1" height="1" fill="#f08a6f"/><rect x="55" y="23" width="1" height="1" fill="#f08a6f"/><rect x="56" y="23" width="1" height="1" fill="#f6c453"/><rect x="57" y="23" width="1" height="1" fill="#f08a6f"/><rect x="61" y="23" width="1" height="1" fill="#f08a6f"/><rect x="62" y="23" width="1" height="1" fill="#f6c453"/><rect x="63" y="23" width="1" height="1" fill="#f08a6f"/><rect x="68" y="23" width="1" height="1" fill="#f08a6f"/><rect x="69" y="23" width="1" height="1" fill="#f6c453"/><rect x="70" y="23" width="1" height="1" fill="#f08a6f"/></g><g id="potFill"></g><g class="k-pot"><rect x="55" y="14" width="18" height="1" fill="#3b2418"/><rect x="53" y="15" width="3" height="1" fill="#3b2418"/><rect x="56" y="15" width="16" height="1" fill="#e2553b"/><rect x="72" y="15" width="3" height="1" fill="#3b2418"/><rect x="53" y="16" width="1" height="1" fill="#3b2418"/><rect x="55" y="16" width="1" height="1" fill="#3b2418"/><rect x="56" y="16" width="16" height="1" fill="#f08a6f"/><rect x="72" y="16" width="1" height="1" fill="#3b2418"/><rect x="74" y="16" width="1" height="1" fill="#3b2418"/><rect x="56" y="17" width="1" height="1" fill="#3b2418"/><rect x="57" y="17" width="14" height="1" fill="#e2553b"/><rect x="71" y="17" width="1" height="1" fill="#3b2418"/><rect x="56" y="18" width="1" height="1" fill="#3b2418"/><rect x="57" y="18" width="1" height="1" fill="#e2553b"/><rect x="58" y="18" width="1" height="1" fill="#fffaf0"/><rect x="59" y="18" width="10" height="1" fill="#e2553b"/><rect x="69" y="18" width="1" height="1" fill="#a83a26"/><rect x="70" y="18" width="1" height="1" fill="#e2553b"/><rect x="71" y="18" width="1" height="1" fill="#3b2418"/><rect x="56" y="19" width="1" height="1" fill="#3b2418"/><rect x="57" y="19" width="1" height="1" fill="#e2553b"/><rect x="58" y="19" width="1" height="1" fill="#fffaf0"/><rect x="59" y="19" width="10" height="1" fill="#e2553b"/><rect x="69" y="19" width="1" height="1" fill="#a83a26"/><rect x="70" y="19" width="1" height="1" fill="#e2553b"/><rect x="71" y="19" width="1" height="1" fill="#3b2418"/><rect x="56" y="20" width="1" height="1" fill="#3b2418"/><rect x="57" y="20" width="12" height="1" fill="#e2553b"/><rect x="69" y="20" width="1" height="1" fill="#a83a26"/><rect x="70" y="20" width="1" height="1" fill="#e2553b"/><rect x="71" y="20" width="1" height="1" fill="#3b2418"/><rect x="56" y="21" width="1" height="1" fill="#3b2418"/><rect x="57" y="21" width="12" height="1" fill="#e2553b"/><rect x="69" y="21" width="1" height="1" fill="#a83a26"/><rect x="70" y="21" width="1" height="1" fill="#e2553b"/><rect x="71" y="21" width="1" height="1" fill="#3b2418"/><rect x="56" y="22" width="1" height="1" fill="#3b2418"/><rect x="57" y="22" width="14" height="1" fill="#e2553b"/><rect x="71" y="22" width="1" height="1" fill="#3b2418"/><rect x="57" y="23" width="14" height="1" fill="#3b2418"/></g><g class="k-steam"><rect x="60" y="3" width="1" height="1" fill="#e9dcc6"/><rect x="67" y="3" width="1" height="1" fill="#e9dcc6"/><rect x="59" y="4" width="1" height="1" fill="#e9dcc6"/><rect x="66" y="4" width="1" height="1" fill="#e9dcc6"/><rect x="59" y="5" width="1" height="1" fill="#e9dcc6"/><rect x="67" y="5" width="1" height="1" fill="#e9dcc6"/><rect x="60" y="6" width="1" height="1" fill="#e9dcc6"/><rect x="68" y="6" width="1" height="1" fill="#e9dcc6"/><rect x="71" y="6" width="1" height="1" fill="#e9dcc6"/><rect x="61" y="7" width="1" height="1" fill="#e9dcc6"/><rect x="67" y="7" width="1" height="1" fill="#e9dcc6"/><rect x="70" y="7" width="1" height="1" fill="#e9dcc6"/><rect x="60" y="8" width="1" height="1" fill="#e9dcc6"/><rect x="66" y="8" width="1" height="1" fill="#e9dcc6"/><rect x="71" y="8" width="1" height="1" fill="#e9dcc6"/></g><g class="k-board"><rect x="84" y="23" width="20" height="1" fill="#3b2418"/><rect x="84" y="24" width="1" height="1" fill="#3b2418"/><rect x="85" y="24" width="17" height="1" fill="#c98a4b"/><rect x="102" y="24" width="2" height="1" fill="#3b2418"/><rect x="84" y="25" width="20" height="1" fill="#3b2418"/></g><g id="boardFill"></g><g class="k-knife"><rect x="104" y="13" width="2" height="1" fill="#3b2418"/><rect x="103" y="14" width="1" height="1" fill="#3b2418"/><rect x="104" y="14" width="1" height="1" fill="#d7dde0"/><rect x="105" y="14" width="1" height="1" fill="#3b2418"/><rect x="102" y="15" width="1" height="1" fill="#3b2418"/><rect x="103" y="15" width="2" height="1" fill="#d7dde0"/><rect x="105" y="15" width="1" height="1" fill="#3b2418"/><rect x="101" y="16" width="1" height="1" fill="#3b2418"/><rect x="102" y="16" width="2" height="1" fill="#d7dde0"/><rect x="104" y="16" width="1" height="1" fill="#3b2418"/><rect x="100" y="17" width="1" height="1" fill="#3b2418"/><rect x="101" y="17" width="2" height="1" fill="#d7dde0"/><rect x="103" y="17" width="1" height="1" fill="#3b2418"/><rect x="99" y="18" width="1" height="1" fill="#3b2418"/><rect x="100" y="18" width="2" height="1" fill="#d7dde0"/><rect x="102" y="18" width="1" height="1" fill="#3b2418"/><rect x="98" y="19" width="4" height="1" fill="#3b2418"/><rect x="98" y="20" width="1" height="1" fill="#3b2418"/><rect x="99" y="20" width="1" height="1" fill="#2b1d14"/><rect x="100" y="20" width="1" height="1" fill="#3b2418"/><rect x="98" y="21" width="2" height="1" fill="#3b2418"/></g><g class="k-chef"><g class="c-body"><rect x="35" y="4" width="8" height="1" fill="#3b2418"/><rect x="34" y="5" width="1" height="1" fill="#3b2418"/><rect x="35" y="5" width="8" height="1" fill="#fffaf0"/><rect x="43" y="5" width="1" height="1" fill="#3b2418"/><rect x="33" y="6" width="1" height="1" fill="#3b2418"/><rect x="34" y="6" width="10" height="1" fill="#fffaf0"/><rect x="44" y="6" width="1" height="1" fill="#3b2418"/><rect x="33" y="7" width="1" height="1" fill="#3b2418"/><rect x="34" y="7" width="8" height="1" fill="#fffaf0"/><rect x="42" y="7" width="1" height="1" fill="#e9dcc6"/><rect x="43" y="7" width="1" height="1" fill="#fffaf0"/><rect x="44" y="7" width="1" height="1" fill="#3b2418"/><rect x="34" y="8" width="1" height="1" fill="#3b2418"/><rect x="35" y="8" width="6" height="1" fill="#fffaf0"/><rect x="41" y="8" width="1" height="1" fill="#e9dcc6"/><rect x="42" y="8" width="1" height="1" fill="#fffaf0"/><rect x="43" y="8" width="1" height="1" fill="#3b2418"/><rect x="34" y="9" width="10" height="1" fill="#3b2418"/><rect x="34" y="10" width="1" height="1" fill="#3b2418"/><rect x="35" y="10" width="8" height="1" fill="#f4c9a0"/><rect x="43" y="10" width="1" height="1" fill="#3b2418"/><rect x="33" y="11" width="1" height="1" fill="#3b2418"/><rect x="34" y="11" width="10" height="1" fill="#f4c9a0"/><rect x="44" y="11" width="1" height="1" fill="#3b2418"/><rect x="33" y="12" width="1" height="1" fill="#3b2418"/><rect x="34" y="12" width="10" height="1" fill="#f4c9a0"/><rect x="44" y="12" width="1" height="1" fill="#3b2418"/><rect x="33" y="13" width="1" height="1" fill="#3b2418"/><rect x="34" y="13" width="1" height="1" fill="#f4c9a0"/><rect x="35" y="13" width="1" height="1" fill="#f08a8a"/><rect x="36" y="13" width="6" height="1" fill="#f4c9a0"/><rect x="42" y="13" width="1" height="1" fill="#f08a8a"/><rect x="43" y="13" width="1" height="1" fill="#f4c9a0"/><rect x="44" y="13" width="1" height="1" fill="#3b2418"/><rect x="33" y="14" width="1" height="1" fill="#3b2418"/><rect x="34" y="14" width="10" height="1" fill="#f4c9a0"/><rect x="44" y="14" width="1" height="1" fill="#3b2418"/><rect x="34" y="15" width="1" height="1" fill="#3b2418"/><rect x="35" y="15" width="8" height="1" fill="#f4c9a0"/><rect x="43" y="15" width="1" height="1" fill="#3b2418"/><rect x="35" y="16" width="2" height="1" fill="#3b2418"/><rect x="37" y="16" width="4" height="1" fill="#e2553b"/><rect x="41" y="16" width="2" height="1" fill="#3b2418"/><rect x="34" y="17" width="1" height="1" fill="#3b2418"/><rect x="35" y="17" width="2" height="1" fill="#fffaf0"/><rect x="37" y="17" width="4" height="1" fill="#e2553b"/><rect x="41" y="17" width="2" height="1" fill="#fffaf0"/><rect x="43" y="17" width="1" height="1" fill="#3b2418"/><rect x="33" y="18" width="1" height="1" fill="#3b2418"/><rect x="34" y="18" width="4" height="1" fill="#fffaf0"/><rect x="38" y="18" width="2" height="1" fill="#e2553b"/><rect x="40" y="18" width="4" height="1" fill="#fffaf0"/><rect x="44" y="18" width="1" height="1" fill="#3b2418"/><rect x="33" y="19" width="1" height="1" fill="#3b2418"/><rect x="34" y="19" width="10" height="1" fill="#fffaf0"/><rect x="44" y="19" width="1" height="1" fill="#3b2418"/><rect x="33" y="20" width="1" height="1" fill="#3b2418"/><rect x="34" y="20" width="1" height="1" fill="#fffaf0"/><rect x="35" y="20" width="8" height="1" fill="#d7c5a8"/><rect x="43" y="20" width="1" height="1" fill="#fffaf0"/><rect x="44" y="20" width="1" height="1" fill="#3b2418"/><rect x="33" y="21" width="1" height="1" fill="#3b2418"/><rect x="34" y="21" width="1" height="1" fill="#fffaf0"/><rect x="35" y="21" width="1" height="1" fill="#d7c5a8"/><rect x="36" y="21" width="6" height="1" fill="#f6e3b4"/><rect x="42" y="21" width="1" height="1" fill="#d7c5a8"/><rect x="43" y="21" width="1" height="1" fill="#fffaf0"/><rect x="44" y="21" width="1" height="1" fill="#3b2418"/><rect x="33" y="22" width="1" height="1" fill="#3b2418"/><rect x="34" y="22" width="1" height="1" fill="#fffaf0"/><rect x="35" y="22" width="1" height="1" fill="#d7c5a8"/><rect x="36" y="22" width="6" height="1" fill="#f6e3b4"/><rect x="42" y="22" width="1" height="1" fill="#d7c5a8"/><rect x="43" y="22" width="1" height="1" fill="#fffaf0"/><rect x="44" y="22" width="1" height="1" fill="#3b2418"/><rect x="33" y="23" width="1" height="1" fill="#3b2418"/><rect x="34" y="23" width="1" height="1" fill="#fffaf0"/><rect x="35" y="23" width="1" height="1" fill="#d7c5a8"/><rect x="36" y="23" width="6" height="1" fill="#f6e3b4"/><rect x="42" y="23" width="1" height="1" fill="#d7c5a8"/><rect x="43" y="23" width="1" height="1" fill="#fffaf0"/><rect x="44" y="23" width="1" height="1" fill="#3b2418"/><rect x="33" y="24" width="1" height="1" fill="#3b2418"/><rect x="34" y="24" width="1" height="1" fill="#fffaf0"/><rect x="35" y="24" width="1" height="1" fill="#d7c5a8"/><rect x="36" y="24" width="6" height="1" fill="#f6e3b4"/><rect x="42" y="24" width="1" height="1" fill="#d7c5a8"/><rect x="43" y="24" width="1" height="1" fill="#fffaf0"/><rect x="44" y="24" width="1" height="1" fill="#3b2418"/><rect x="33" y="25" width="1" height="1" fill="#3b2418"/><rect x="34" y="25" width="1" height="1" fill="#fffaf0"/><rect x="35" y="25" width="1" height="1" fill="#d7c5a8"/><rect x="36" y="25" width="6" height="1" fill="#f6e3b4"/><rect x="42" y="25" width="1" height="1" fill="#d7c5a8"/><rect x="43" y="25" width="1" height="1" fill="#fffaf0"/><rect x="44" y="25" width="1" height="1" fill="#3b2418"/></g><g class="c-eyes"><rect x="35" y="12" width="1" height="1" fill="#3b2418"/><rect x="40" y="12" width="1" height="1" fill="#3b2418"/></g><g class="c-eyes-up"><rect x="35" y="11" width="1" height="1" fill="#3b2418"/><rect x="40" y="11" width="1" height="1" fill="#3b2418"/></g><g class="c-mouth-closed"><rect x="37" y="14" width="2" height="1" fill="#3b2418"/></g><g class="c-mouth-open"><rect x="37" y="14" width="2" height="1" fill="#3b2418"/><rect x="37" y="15" width="2" height="1" fill="#a83a26"/></g><g class="c-mouth-smile"><rect x="36" y="14" width="1" height="1" fill="#3b2418"/><rect x="39" y="14" width="1" height="1" fill="#3b2418"/><rect x="37" y="15" width="2" height="1" fill="#3b2418"/></g><g class="c-arm-l"><rect x="32" y="18" width="1" height="1" fill="#3b2418"/><rect x="31" y="19" width="1" height="1" fill="#3b2418"/><rect x="32" y="19" width="1" height="1" fill="#fffaf0"/><rect x="33" y="19" width="1" height="1" fill="#3b2418"/><rect x="31" y="20" width="1" height="1" fill="#3b2418"/><rect x="32" y="20" width="1" height="1" fill="#fffaf0"/><rect x="33" y="20" width="1" height="1" fill="#3b2418"/><rect x="31" y="21" width="1" height="1" fill="#3b2418"/><rect x="32" y="21" width="1" height="1" fill="#fffaf0"/><rect x="33" y="21" width="1" height="1" fill="#3b2418"/><rect x="31" y="22" width="1" height="1" fill="#3b2418"/><rect x="32" y="22" width="1" height="1" fill="#fffaf0"/><rect x="33" y="22" width="1" height="1" fill="#3b2418"/><rect x="31" y="23" width="1" height="1" fill="#3b2418"/><rect x="32" y="23" width="1" height="1" fill="#f4c9a0"/><rect x="33" y="23" width="1" height="1" fill="#3b2418"/><rect x="32" y="24" width="1" height="1" fill="#3b2418"/></g><g class="c-arm-r"><rect x="45" y="18" width="1" height="1" fill="#3b2418"/><rect x="44" y="19" width="1" height="1" fill="#3b2418"/><rect x="45" y="19" width="1" height="1" fill="#fffaf0"/><rect x="46" y="19" width="1" height="1" fill="#3b2418"/><rect x="44" y="20" width="1" height="1" fill="#3b2418"/><rect x="45" y="20" width="1" height="1" fill="#fffaf0"/><rect x="46" y="20" width="1" height="1" fill="#3b2418"/><rect x="44" y="21" width="1" height="1" fill="#3b2418"/><rect x="45" y="21" width="1" height="1" fill="#fffaf0"/><rect x="46" y="21" width="1" height="1" fill="#3b2418"/><rect x="44" y="22" width="1" height="1" fill="#3b2418"/><rect x="45" y="22" width="1" height="1" fill="#fffaf0"/><rect x="46" y="22" width="1" height="1" fill="#3b2418"/><rect x="44" y="23" width="1" height="1" fill="#3b2418"/><rect x="45" y="23" width="1" height="1" fill="#f4c9a0"/><rect x="46" y="23" width="1" height="1" fill="#3b2418"/><rect x="45" y="24" width="1" height="1" fill="#3b2418"/></g><g class="c-arm-ear"><rect x="45" y="12" width="2" height="1" fill="#3b2418"/><rect x="44" y="13" width="1" height="1" fill="#3b2418"/><rect x="45" y="13" width="1" height="1" fill="#f4c9a0"/><rect x="46" y="13" width="1" height="1" fill="#3b2418"/><rect x="44" y="14" width="1" height="1" fill="#3b2418"/><rect x="45" y="14" width="1" height="1" fill="#fffaf0"/><rect x="46" y="14" width="1" height="1" fill="#3b2418"/><rect x="43" y="15" width="1" height="1" fill="#3b2418"/><rect x="44" y="15" width="1" height="1" fill="#fffaf0"/><rect x="45" y="15" width="1" height="1" fill="#3b2418"/><rect x="43" y="16" width="1" height="1" fill="#3b2418"/><rect x="44" y="16" width="1" height="1" fill="#fffaf0"/><rect x="45" y="16" width="1" height="1" fill="#3b2418"/><rect x="42" y="17" width="1" height="1" fill="#3b2418"/><rect x="43" y="17" width="1" height="1" fill="#fffaf0"/><rect x="44" y="17" width="1" height="1" fill="#3b2418"/></g><g class="c-arm-up"><rect x="31" y="10" width="2" height="1" fill="#3b2418"/><rect x="30" y="11" width="1" height="1" fill="#3b2418"/><rect x="31" y="11" width="1" height="1" fill="#f4c9a0"/><rect x="32" y="11" width="1" height="1" fill="#3b2418"/><rect x="30" y="12" width="1" height="1" fill="#3b2418"/><rect x="31" y="12" width="1" height="1" fill="#fffaf0"/><rect x="32" y="12" width="1" height="1" fill="#3b2418"/><rect x="30" y="13" width="1" height="1" fill="#3b2418"/><rect x="31" y="13" width="1" height="1" fill="#fffaf0"/><rect x="32" y="13" width="1" height="1" fill="#3b2418"/><rect x="31" y="14" width="1" height="1" fill="#3b2418"/><rect x="32" y="14" width="1" height="1" fill="#fffaf0"/><rect x="33" y="14" width="1" height="1" fill="#3b2418"/><rect x="31" y="15" width="1" height="1" fill="#3b2418"/><rect x="32" y="15" width="1" height="1" fill="#fffaf0"/><rect x="33" y="15" width="1" height="1" fill="#3b2418"/><rect x="32" y="16" width="1" height="1" fill="#3b2418"/><rect x="33" y="16" width="1" height="1" fill="#fffaf0"/><rect x="34" y="16" width="1" height="1" fill="#3b2418"/><rect x="33" y="17" width="1" height="1" fill="#3b2418"/><rect x="45" y="10" width="2" height="1" fill="#3b2418"/><rect x="45" y="11" width="1" height="1" fill="#3b2418"/><rect x="46" y="11" width="1" height="1" fill="#f4c9a0"/><rect x="47" y="11" width="1" height="1" fill="#3b2418"/><rect x="45" y="12" width="1" height="1" fill="#3b2418"/><rect x="46" y="12" width="1" height="1" fill="#fffaf0"/><rect x="47" y="12" width="1" height="1" fill="#3b2418"/><rect x="45" y="13" width="1" height="1" fill="#3b2418"/><rect x="46" y="13" width="1" height="1" fill="#fffaf0"/><rect x="47" y="13" width="1" height="1" fill="#3b2418"/><rect x="44" y="14" width="1" height="1" fill="#3b2418"/><rect x="45" y="14" width="1" height="1" fill="#fffaf0"/><rect x="46" y="14" width="1" height="1" fill="#3b2418"/><rect x="44" y="15" width="1" height="1" fill="#3b2418"/><rect x="45" y="15" width="1" height="1" fill="#fffaf0"/><rect x="46" y="15" width="1" height="1" fill="#3b2418"/><rect x="44" y="16" width="1" height="1" fill="#3b2418"/><rect x="45" y="16" width="1" height="1" fill="#fffaf0"/><rect x="46" y="16" width="1" height="1" fill="#3b2418"/><rect x="44" y="17" width="1" height="1" fill="#3b2418"/></g><g class="c-stir c-stirA"><rect x="54" y="14" width="1" height="1" fill="#3b2418"/><rect x="53" y="15" width="1" height="1" fill="#3b2418"/><rect x="54" y="15" width="1" height="1" fill="#7a4a2a"/><rect x="52" y="16" width="1" height="1" fill="#3b2418"/><rect x="53" y="16" width="1" height="1" fill="#7a4a2a"/><rect x="51" y="17" width="1" height="1" fill="#3b2418"/><rect x="52" y="17" width="1" height="1" fill="#7a4a2a"/><rect x="50" y="18" width="1" height="1" fill="#3b2418"/><rect x="51" y="18" width="1" height="1" fill="#7a4a2a"/><rect x="43" y="19" width="6" height="1" fill="#3b2418"/><rect x="49" y="19" width="1" height="1" fill="#f4c9a0"/><rect x="50" y="19" width="1" height="1" fill="#3b2418"/><rect x="43" y="20" width="6" height="1" fill="#fffaf0"/><rect x="49" y="20" width="1" height="1" fill="#f4c9a0"/><rect x="50" y="20" width="1" height="1" fill="#3b2418"/><rect x="43" y="21" width="7" height="1" fill="#3b2418"/></g><g class="c-stir c-stirB"><rect x="55" y="14" width="1" height="1" fill="#3b2418"/><rect x="55" y="15" width="1" height="1" fill="#7a4a2a"/><rect x="54" y="16" width="1" height="1" fill="#3b2418"/><rect x="55" y="16" width="1" height="1" fill="#7a4a2a"/><rect x="53" y="17" width="1" height="1" fill="#3b2418"/><rect x="54" y="17" width="1" height="1" fill="#7a4a2a"/><rect x="52" y="18" width="1" height="1" fill="#3b2418"/><rect x="53" y="18" width="1" height="1" fill="#7a4a2a"/><rect x="43" y="19" width="7" height="1" fill="#3b2418"/><rect x="50" y="19" width="1" height="1" fill="#f4c9a0"/><rect x="51" y="19" width="1" height="1" fill="#3b2418"/><rect x="43" y="20" width="7" height="1" fill="#fffaf0"/><rect x="50" y="20" width="1" height="1" fill="#f4c9a0"/><rect x="51" y="20" width="1" height="1" fill="#3b2418"/><rect x="43" y="21" width="8" height="1" fill="#3b2418"/></g></g></svg>
+      <div id="chefBubble">Snap your fridge and let's cook!</div>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <label class="btn" id="pickBtn" for="photo">📷 Snap your fridge</label>
+    <button class="btn ghost on" id="resetBtn">↺ Reset session</button>
+    <button class="btn ghost on" id="gestureBtn">✋ Gestures: off</button>
+  </div>
+  <input type="file" id="photo" accept="image/*" capture="environment">
+  <div id="previewWrap"><img id="preview" hidden alt=""></div>
+  <div id="status"></div>
+ </div>
+
+ <div id="mainCol">
+  <section id="recipe">
+    <div id="dish"></div>
+    <div id="why"></div>
+    <div id="recipeBadge"></div>
+    <div id="now">
+      <div id="nowLabel"></div>
+      <div id="progress"><div id="progressFill"></div></div>
+      <div id="nowText"></div>
+      <button class="btn" id="doneBtn" hidden>🍽 I'm done!</button>
+    </div>
+  </section>
+
+  <aside id="mem" class="px">
+    <h3>What I remember <small id="memBackend"></small></h3>
+    <div class="diners">Cooking for: <span id="dinerChips"></span></div>
+    <div id="memList"><ul><li class="empty">Nothing yet — tell me about allergies or dislikes, or who's eating tonight.</li></ul></div>
+  </aside>
+ </div>
+
+  <!-- left sidebar while cooking: ingredients + all steps -->
+  <aside id="side">
+    <h2>Ingredients</h2>
+    <ul id="ingredients" class="px"></ul>
+    <h2>Steps</h2>
+    <ol id="steps"></ol>
+  </aside>
+
+  <section id="convo">
+    <h2>Conversation</h2>
+    <div id="chat"></div>
+  </section>
+</main>
+
+<div id="toast" role="alert"></div>
+
+<div id="finish" role="dialog" aria-label="Dish finished">
+  <div id="finishCard" class="px">
+    <i class="spark" style="left:12%;top:16%"></i><i class="spark" style="right:14%;top:10%;animation-delay:.3s"></i>
+    <i class="spark" style="right:9%;top:42%;animation-delay:.6s"></i><i class="spark" style="left:8%;top:46%;animation-delay:.15s"></i>
+    <svg class="plate" viewBox="0 0 32 24" shape-rendering="crispEdges" aria-hidden="true">
+      <g class="steam" fill="#c9d6dc"><rect x="11" y="1" width="2" height="4"/><rect x="15" y="0" width="2" height="4"/><rect x="19" y="1" width="2" height="4"/></g>
+      <!-- food mound -->
+      <rect x="10" y="8" width="12" height="1" fill="#3b2418"/><rect x="8" y="9" width="16" height="1" fill="#3b2418"/>
+      <rect x="7" y="10" width="18" height="6" fill="#3b2418"/>
+      <rect x="10" y="9" width="12" height="1" fill="#f6c453"/><rect x="8" y="10" width="16" height="6" fill="#f6c453"/>
+      <rect x="10" y="11" width="2" height="2" fill="#e2553b"/><rect x="15" y="10" width="2" height="2" fill="#9cc27a"/>
+      <rect x="19" y="12" width="2" height="2" fill="#e2553b"/><rect x="12" y="14" width="2" height="1" fill="#5f8a45"/>
+      <rect x="17" y="14" width="3" height="1" fill="#fff6e3"/><rect x="9" y="10" width="3" height="1" fill="#fff3c4"/>
+      <!-- plate -->
+      <rect x="2" y="15" width="28" height="1" fill="#3b2418"/><rect x="1" y="16" width="30" height="3" fill="#3b2418"/>
+      <rect x="3" y="19" width="26" height="1" fill="#3b2418"/><rect x="6" y="20" width="20" height="1" fill="#3b2418"/>
+      <rect x="2" y="16" width="28" height="2" fill="#fffaf0"/><rect x="4" y="18" width="24" height="1" fill="#e9dcc6"/>
+      <rect x="7" y="19" width="18" height="1" fill="#d7c5a8"/><rect x="4" y="16" width="5" height="1" fill="#ffffff"/>
+    </svg>
+    <div id="finishTitle">BON APPÉTIT!</div>
+    <div id="finishDish"></div>
+    <div id="finishStats"></div>
+    <button class="btn" id="finishNew">🍳 Cook something else</button>
+    <button class="btn ghost on" id="finishClose">Close</button>
+    <div id="finishHint">👌 OK gesture also closes this</div>
+  </div>
+</div>
+
+
+<div id="talkBar" class="on">
+  <div id="vstatus">Hold the button (or Space) and talk</div>
+  <button id="talkBtn" aria-label="Hold to talk"><canvas id="orbWave"></canvas><span class="orbIcon" aria-hidden="true"><i style="--h:12px;--d:0s"></i><i style="--h:22px;--d:.2s"></i><i style="--h:30px;--d:.4s"></i><i style="--h:22px;--d:.6s"></i><i style="--h:12px;--d:.8s"></i></span></button>
+  <div id="hint">▲ Hold to answer</div>
+  <div id="cam" class="px">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <div id="camInfo">
+      <div id="camLabel">Starting camera…</div>
+      <div id="camBar"><div id="camBarFill"></div></div>
+      <div class="legend">👌 OK = next step<br>✋ Open hand = talk<br>✊ Fist = send</div>
+    </div>
+  </div>
+  <button id="forgetBtn" title="Clear all remembered preferences">Forget me</button>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let shownRecipe = null;  // recipe the page last auto-scrolled to
+let recipe = null, currentStep = 0, session = 0, onboarding = false;
+function setOnboarding(on) { onboarding = on; $("hint").classList.toggle("on", on); }  // session bumps on reset to drop stale replies
+const cap = (p) => p === "me" ? "Me" : p.charAt(0).toUpperCase() + p.slice(1);
+
+// "✅ Checked against N preferences" badge, filled in when the background eval finishes
+function addBadge(el, evalId) {
+  if (!evalId) return;
+  const b = document.createElement("span");
+  b.className = "badge"; b.textContent = "🔎 Checking preferences…";
+  el.appendChild(b);
+  let tries = 0;
+  const poll = async () => {
+    try {
+      const r = await api("/eval/" + evalId, {}, 10000);
+      if (r.status === "pending") { if (++tries < 30) setTimeout(poll, 800); else b.textContent = "… check timed out"; return; }
+      const n = r.n, word = n === 1 ? "preference" : "preferences";
+      if (r.status === "pass") { b.className = "badge pass"; b.textContent = `✅ Checked against ${n} ${word}`; }
+      else if (r.status === "fail") { b.className = "badge fail"; b.textContent = "⚠️ " + (r.reason || "May conflict with a preference"); }
+      else { b.textContent = "… couldn't check preferences"; }
+    } catch { b.textContent = "… couldn't check preferences"; }
+  };
+  setTimeout(poll, 600);
+}
+
+let toastTimer = null;
+function toast(msg) {
+  $("toast").textContent = "⚠️ " + msg;
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 7000);
+}
+$("toast").onclick = () => $("toast").classList.remove("show");
+
+// fetch with timeout + readable errors (handles non-JSON error pages too)
+async function api(url, opts = {}, timeoutMs = 60000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    let data = null;
+    try { data = await res.json(); } catch { /* not JSON */ }
+    if (!res.ok) {
+      let d = data && data.detail;
+      if (Array.isArray(d)) d = d.map((x) => x.msg || JSON.stringify(x)).join("; ");  // FastAPI 422
+      else if (d && typeof d !== "string") d = JSON.stringify(d);
+      throw new Error(d || `${res.status} ${res.statusText}`);
+    }
+    if (!data) throw new Error("Bad response from server");
+    return data;
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Request timed out — please try again");
+    if (err instanceof TypeError) throw new Error("Can't reach the server — is it running?");
+    throw err;
+  } finally { clearTimeout(t); }
+}
+
+function setStatus(html, isError = false) {
+  $("status").innerHTML = html;
+  $("status").className = isError ? "error" : "";
+}
+
+// Downscale to JPEG (keeps uploads small and converts HEIC etc.)
+function toJpeg(file, maxSide = 1568) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", 0.85);
+    };
+    img.onerror = () => reject(new Error("Could not read image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function render() {
+  if (!recipe) return;
+  $("recipe").style.display = "block";
+  if (!document.body.classList.contains("has-recipe")) recipeStartedAt = Date.now();
+  document.body.classList.add("has-recipe");
+  $("dish").textContent = recipe.dish;
+  $("why").textContent = recipe.why || "";
+  if (recipe.eval_id && $("recipeBadge").dataset.id !== recipe.eval_id) {
+    $("recipeBadge").innerHTML = ""; $("recipeBadge").dataset.id = recipe.eval_id;
+    addBadge($("recipeBadge"), recipe.eval_id);
+  }
+  $("ingredients").innerHTML = "";
+  (recipe.ingredients || []).forEach((i) => {
+    const li = document.createElement("li"); li.textContent = i; li.style.setProperty("--i", $("ingredients").children.length); $("ingredients").appendChild(li);
+  });
+  $("steps").innerHTML = "";
+  recipe.steps.forEach((s, idx) => {
+    const li = document.createElement("li");
+    li.textContent = s;
+    li.className = idx === currentStep ? "px current" : "px";
+    li.style.setProperty("--i", (recipe.ingredients || []).length + idx);
+    $("steps").appendChild(li);
+  });
+  const n = recipe.steps.length;
+  $("nowLabel").textContent = `Step ${currentStep + 1} of ${n}`;
+  $("progressFill").style.width = ((currentStep + 1) / n * 100) + "%";
+  $("nowText").textContent = recipe.steps[currentStep];
+  $("nowText").className = currentStep === n - 1 ? "done" : "";
+  $("doneBtn").hidden = currentStep !== n - 1;
+  updateKitchen();
+  // Scroll the page only once, when a new recipe first appears; later replies leave it where the user is.
+  if (recipe !== shownRecipe) { shownRecipe = recipe; $("now").scrollIntoView({ behavior: "smooth", block: "start" }); }
+  // Keep the current step centred in the sticky sidebar (scrolls the sidebar only, not the page)
+  const side = $("side"), cur = $("steps").children[currentStep];
+  if (cur && getComputedStyle(side).position === "sticky") {
+    const sr = side.getBoundingClientRect(), cr = cur.getBoundingClientRect();
+    side.scrollBy({ top: cr.top - sr.top - (side.clientHeight - cr.height) / 2, behavior: "smooth" });
+  }
+}
+
+// Recognition done -> "Found it" banner -> smooth switch into the cooking layout
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function revealRecipe(update) {
+  $("previewWrap").classList.remove("scanning");
+  const b = document.createElement("span"); b.className = "found"; b.textContent = "✨ Found it: " + recipe.dish;
+  setChef("celebrate", "Ooh, " + recipe.dish + "!");
+  $("status").innerHTML = ""; $("status").className = ""; $("status").appendChild(b);
+  if (!reduceMotion) await sleep(750);
+  let ran = false;
+  const run = () => {
+    if (ran) return;
+    ran = true;
+    setStatus("");
+    update();
+    if (!reduceMotion) {
+      document.body.classList.add("entering");
+      setTimeout(() => document.body.classList.remove("entering"), 1800);
+    }
+  };
+  if (document.startViewTransition && !reduceMotion && !document.hidden) {
+    // a hidden/background tab pauses rendering, which would leave the transition (and the UI) waiting
+    const vt = document.startViewTransition(run);
+    const guard = setTimeout(() => { vt.skipTransition(); run(); }, 1500);
+    try { await Promise.race([vt.finished, sleep(2500)]); } catch { /* transition skipped; DOM already updated */ }
+    clearTimeout(guard);
+    run();
+  } else run();
+  // wait until the entrance animations have actually finished (capped, in case the tab is throttled)
+  if (!reduceMotion) {
+    const entrance = document.getAnimations().filter((an) => an.effect?.target?.closest?.("#side, #now, #dish, #why, #recipeBadge"));
+    await Promise.race([Promise.allSettled(entrance.map((an) => an.finished)), sleep(4000)]);
+  }
+}
+
+$("photo").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  $("preview").src = URL.createObjectURL(file);
+  $("preview").hidden = false;
+  $("recipe").style.display = "none";
+  document.body.classList.remove("has-recipe");
+  $("pickBtn").style.pointerEvents = "none";
+  $("pickBtn").style.opacity = .5;
+  setStatus('<span class="spinner"></span>Looking in your fridge…');
+  $("previewWrap").classList.add("scanning");
+  setChef("thinking", "Let me look in your fridge…");
+  try {
+    const blob = await toJpeg(file);
+    const fd = new FormData();
+    fd.append("image", blob, "fridge.jpg");
+    const mySession = session;
+    const data = await api("/recipe", { method: "POST", body: fd }, 90000);
+    if (mySession !== session) return;
+    if (data.needs_onboarding) {
+      setStatus(""); $("previewWrap").classList.remove("scanning");  // first-time user: answer the allergy question, then we cook this photo
+      setOnboarding(true);
+      addBubble("bot", data.reply);
+      $("chat").lastChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+      playAudio(data.audio_url || data.audio_base64);
+      return;
+    }
+    recipe = data; currentStep = data.current_step || 0;
+    await revealRecipe(() => { render(); addBubble("bot", data.intro); });
+    if (mySession !== session) return;
+    playAudio(data.audio_url || data.audio_base64);  // intro once the cooking screen has fully loaded
+  } catch (err) {
+    $("previewWrap").classList.remove("scanning");
+    setStatus("");
+    toast("Couldn't make a recipe: " + err.message);
+  } finally {
+    $("pickBtn").style.pointerEvents = "";
+    $("pickBtn").style.opacity = 1;
+    e.target.value = "";
+  }
+});
+
+// ---------- Memory panel ----------
+async function refreshMemory() {
+  try {
+    const data = await api("/preferences");
+    $("memBackend").textContent = "(" + data.backend + ")";
+    $("dinerChips").innerHTML = "";
+    data.diners.forEach((d) => { const c = document.createElement("span"); c.className = "chip"; c.textContent = cap(d); $("dinerChips").appendChild(c); });
+    const list = $("memList");
+    list.innerHTML = "";
+    if (!data.history.length) {
+      list.innerHTML = '<ul><li class="empty">Nothing yet — tell me about allergies or dislikes, or who\'s eating tonight.</li></ul>';
+      return;
+    }
+    // Group by person ("me" first, then tonight's diners, then everyone else); superseded facts struck through
+    const people = [...new Set(["me", ...data.diners, ...data.history.map((r) => r.person || "me")])];
+    people.forEach((p) => {
+      const facts = data.history.filter((r) => (r.person || "me") === p).sort((a, b) => !!a.superseded_at - !!b.superseded_at);
+      if (!facts.length && !data.diners.includes(p)) return;
+      const h = document.createElement("div"); h.className = "person"; h.textContent = cap(p);
+      if (data.diners.includes(p)) { const t = document.createElement("span"); t.className = "tonight"; t.textContent = "🍴 eating tonight"; h.appendChild(t); }
+      list.appendChild(h);
+      const ul = document.createElement("ul");
+      if (!facts.length) ul.innerHTML = '<li class="empty">No preferences yet</li>';
+      facts.forEach((r) => {
+        const li = document.createElement("li");
+        li.textContent = r.fact;
+        if (r.superseded_at) li.className = "old";
+        const t = document.createElement("time");
+        t.textContent = new Date(r.created_at).toLocaleString();
+        li.appendChild(t);
+        ul.appendChild(li);
+      });
+      list.appendChild(ul);
+    });
+  } catch (err) { toast("Memory unavailable: " + err.message); }
+}
+refreshMemory();
+
+// ---------- Voice ----------
+const player = new Audio();
+// 0.1s of silent 8kHz WAV, generated so we have a valid source to unlock playback with
+const SILENT_WAV = (() => {
+  const n = 800, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const w = (o, str) => [...str].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return "data:audio/wav;base64," + btoa(String.fromCharCode(...new Uint8Array(buf)));
+})();
+let stream = null, recorder = null, chunks = [], recStart = 0, busy = false;
+
+function vstatus(text, cls = "") {
+  $("vstatus").textContent = text; $("vstatus").className = cls; setChef(cls || "idle");
+  $("talkBtn").dataset.state = cls || "idle";
+}
+
+// ---------- Voice orb: live waveform from the mic while recording ----------
+let orbCtx = null, orbAnalyser = null, orbRaf = 0;
+function orbRecord(on) {
+  const b = $("talkBtn");
+  b.classList.toggle("rec", on);
+  b.setAttribute("aria-label", on ? "Release to send" : "Hold to talk");
+  if (on) { b.classList.remove("back"); startOrbWave(); }
+  else {
+    cancelAnimationFrame(orbRaf); b.style.setProperty("--lvl", 0);
+    b.classList.add("back"); setTimeout(() => b.classList.remove("back"), 800);  // springy return to a ball
+  }
+}
+function startOrbWave() {
+  if (!stream) return;
+  try {
+    if (!orbCtx) {
+      orbCtx = new (window.AudioContext || window.webkitAudioContext)();
+      orbAnalyser = orbCtx.createAnalyser(); orbAnalyser.fftSize = 512;
+      orbCtx.createMediaStreamSource(stream).connect(orbAnalyser);
+    }
+    orbCtx.resume();
+  } catch { return; }
+  const c = $("orbWave"), g = c.getContext("2d"), data = new Uint8Array(orbAnalyser.fftSize);
+  let t = 0, smooth = 0;
+  const draw = () => {
+    const w = (c.width = c.clientWidth * devicePixelRatio), h = (c.height = c.clientHeight * devicePixelRatio);
+    orbAnalyser.getByteTimeDomainData(data);
+    let sum = 0; for (const v of data) sum += ((v - 128) / 128) ** 2;
+    const rms = Math.sqrt(sum / data.length);
+    smooth = smooth * .8 + Math.min(1, rms * 4) * .2;
+    $("talkBtn").style.setProperty("--lvl", smooth.toFixed(3));
+    g.clearRect(0, 0, w, h);
+    t += .12;
+    // three layered liquid waves whose height follows your voice
+    [[1, .95, 3], [.6, .55, 2], [.35, .35, 2]].forEach(([amp, alpha, lw], i) => {
+      g.beginPath();
+      for (let x = 0; x <= w; x += 4 * devicePixelRatio) {
+        const p = x / w, env = Math.sin(Math.PI * p);  // taper at both ends
+        const y = h / 2 + Math.sin(p * 10 + t * (1 + i * .4) + i) * env * (h * .08 + smooth * h * .34) * amp;
+        x ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.strokeStyle = `rgba(255,246,227,${alpha})`; g.lineWidth = lw * devicePixelRatio; g.lineCap = "round"; g.stroke();
+    });
+    orbRaf = requestAnimationFrame(draw);
+  };
+  cancelAnimationFrame(orbRaf);
+  draw();
+}
+const idle = () => vstatus(onboarding ? "Hold the button (or Space) to answer" : "Hold the button (or Space) and talk");
+
+function addBubble(who, text, pref, evalId) {
+  if (!text) return;
+  $("convo").style.display = "block";
+  const b = document.createElement("div");
+  b.className = "bubble px " + who;
+  b.textContent = text;
+  if (pref) {
+    const p = document.createElement("span"); p.className = "pref";
+    p.textContent = "🧠 Remembered" + (pref.person && pref.person !== "me" ? " for " + cap(pref.person) : "") + ": " + pref.fact;
+    b.appendChild(p);
+  }
+  addBadge(b, evalId);
+  $("chat").appendChild(b);
+}
+
+// Unlock audio on first user gesture (Safari/iOS autoplay rules)
+document.addEventListener("pointerdown", () => {
+  player.src = SILENT_WAV;
+  player.play().catch(() => {});
+}, { once: true });
+
+// src is either a streamed URL ("/tts?text=...", starts playing on the first chunk) or base64 mp3
+function playAudio(src) {
+  if (!src) { idle(); return; }
+  player.src = src.startsWith("/") ? src : "data:audio/mpeg;base64," + src;
+  vstatus("Speaking…", "speaking");
+  player.onended = idle;
+  player.onerror = idle;
+  player.play().catch(() => { idle(); toast("Tap the page once to enable sound"); });
+}
+
+async function startRec(viaGesture = false) {
+  if (busy || recorder?.state === "recording") return;
+  player.pause();  // barge-in: stop talking when the user talks
+  try {
+    stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) { idle(); toast("Microphone blocked: " + err.message); return; }
+  const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported(m));
+  recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  chunks = [];
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = sendAudio;
+  recorder.start();
+  recStart = Date.now();
+  orbRecord(true);
+  vstatus(viaGesture ? "Listening… make a fist to send" : "Listening… release to send", "listening");
+}
+
+function stopRec() {
+  if (recorder?.state !== "recording") return;
+  recorder.stop();
+  orbRecord(false);
+}
+
+async function sendAudio() {
+  if (Date.now() - recStart < 400) { vstatus("Too short — hold the button while you talk"); return; }
+  busy = true; $("talkBtn").disabled = true;
+  vstatus("Thinking…", "thinking");
+  try {
+    const type = recorder.mimeType || "audio/webm";
+    const blob = new Blob(chunks, { type });
+    if (!blob.size) throw new Error("No audio recorded");
+    const fd = new FormData();
+    fd.append("audio", blob, type.includes("mp4") ? "talk.mp4" : "talk.webm");
+    const mySession = session;
+    if (onboarding) $("previewWrap").classList.add("scanning");  // the waiting photo is being cooked now
+    const data = await api("/talk", { method: "POST", body: fd });
+    if (mySession !== session) return;  // session was reset while thinking
+    const nearBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 160;
+    addBubble("user", data.transcript || "(nothing heard)");
+    if (data.recipe) {  // onboarding answered: the waiting photo is now a recipe
+      setOnboarding(false);
+      recipe = data.recipe; currentStep = 0;
+      addBubble("bot", data.reply);
+      await revealRecipe(render);
+      if (mySession !== session) return;
+    } else {
+      $("previewWrap").classList.remove("scanning");  // e.g. onboarding answer not heard: still waiting
+      addBubble("bot", data.reply, data.new_preference, data.eval_id);
+      if (recipe && data.current_step !== currentStep) { currentStep = data.current_step; render(); }
+    }
+    // follow the chat only if the user is already at the bottom; otherwise don't move the page
+    if (nearBottom) $("chat").lastChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (data.finished) celebrate(data.audio_url || data.audio_base64); else playAudio(data.audio_url || data.audio_base64);
+    refreshMemory();
+    if (data.new_preference) [3000, 8000].forEach((ms) => setTimeout(refreshMemory, ms));  // saved in the background
+  } catch (err) {
+    $("previewWrap").classList.remove("scanning");
+    idle();
+    toast(err.message);
+  } finally {
+    busy = false; $("talkBtn").disabled = false;
+  }
+}
+
+// Reset: clears recipe, chat and tonight's diners (server + screen). Long-term memory is kept.
+$("resetBtn").addEventListener("click", async () => {
+  if (recorder?.state === "recording") { recorder.onstop = null; recorder.stop(); }
+  player.pause();
+  session++;
+  recipe = null; currentStep = 0; busy = false;
+  setOnboarding(false);
+  $("chat").innerHTML = "";
+  $("convo").style.display = "none";
+  $("recipe").style.display = "none";
+  document.body.classList.remove("has-recipe");
+  $("recipeBadge").innerHTML = ""; delete $("recipeBadge").dataset.id;
+  $("preview").hidden = true;
+  $("talkBtn").disabled = false;
+  orbRecord(false);
+  idle();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  try { await api("/reset", { method: "POST" }); setStatus("Session reset. Tell me who's eating, then snap a photo."); }
+  catch (err) { toast("Reset failed: " + err.message); }
+  refreshMemory();
+});
+
+// Forget me: wipe all remembered preferences (to rehearse the first-time onboarding)
+$("forgetBtn").addEventListener("click", async () => {
+  if (!confirm("Forget all remembered preferences?")) return;
+  try {
+    await api("/memory/reset", { method: "POST" });
+    setOnboarding(false);
+    setStatus("Memory cleared. Next photo will start with the allergy question.");
+  } catch (err) { toast("Couldn't clear memory: " + err.message); }
+  refreshMemory();
+});
+
+// ---------- Pixel kitchen: pot contents follow the steps, chef mirrors the voice state ----------
+const RX = (words) => new RegExp("\\b(" + words + ")", "i");
+const HEAT = RX("heat|fry|fried|saut|boil|simmer|cook|sear|scrambl|melt|toast|roast|bake|steam|brown|warm|stir");
+const PREP = RX("chop|dice|slice|mince|shred|cut|peel|grate|tear|wash|rinse|whisk|beat|crack|trim");
+const SERVE = RX("serve|plate|garnish|enjoy");
+const INGR = [  // keyword -> pixel colours
+  [RX("egg"), ["#fff6e3", "#f6c453"]], [RX("rice"), ["#fffaf0", "#f1ead8"]], [RX("noodle|pasta|spaghetti|udon"), ["#f3d38b", "#e8c06b"]],
+  [RX("chicken|pork|beef|meat|bacon|sausage|turkey|ham"), ["#b5651d", "#8a4b2a"]], [RX("fish|salmon|shrimp|prawn|tuna"), ["#f08a6f", "#f4b39c"]],
+  [RX("tomato"), ["#e2553b"]], [RX("chili|chilli|red pepper"), ["#c0392b"]], [RX("carrot"), ["#f08a24"]],
+  [RX("broccoli|spinach|lettuce|kale|peas|scallion|green onion|herb|cilantro|basil|parsley|cabbage|zucchini|bell pepper|green pepper|celery|veggie|vegetable"), ["#5f8a45", "#9cc27a"]],
+  [RX("onion"), ["#f3e3f0", "#d9b3d6"]], [RX("garlic|ginger"), ["#f7f0e1", "#e9dcc6"]], [RX("cheese"), ["#f6c453", "#ffd76a"]],
+  [RX("butter"), ["#ffe08a"]], [RX("mushroom"), ["#a0826d", "#c8ab94"]], [RX("potato"), ["#e0c080"]], [RX("corn"), ["#f7d23e"]],
+  [RX("tofu"), ["#fffbe8"]], [RX("lemon|lime"), ["#f7e64f"]], [RX("bean|lentil"), ["#7a4a2a"]], [RX("soy|sauce"), ["#5a3a22"]],
+];
+const SVGNS = "http://www.w3.org/2000/svg";
+const stepMode = (t) => (SERVE.test(t) ? "serve" : HEAT.test(t) ? "heat" : PREP.test(t) ? "prep" : "rest");
+const stepIngr = (t) => INGR.filter(([re]) => re.test(t)).map(([, c]) => c);
+function px(parent, x, y, color, w = 1) {
+  const r = document.createElementNS(SVGNS, "rect");
+  r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", w); r.setAttribute("height", 1); r.setAttribute("fill", color);
+  parent.appendChild(r);
+}
+function updateKitchen(done = false) {
+  const k = $("kitchen"), pot = $("potFill"), board = $("boardFill");
+  pot.innerHTML = ""; board.innerHTML = "";
+  if (!recipe) { k.dataset.mode = "empty"; return; }
+  const steps = recipe.steps, cur = Math.min(currentStep, steps.length - 1);
+  const mode = done ? "done" : stepMode(steps[cur]);
+  k.dataset.mode = mode === "serve" ? "done" : mode;
+  // everything mentioned in non-prep steps so far is in the pot; prep-step ingredients sit on the board
+  const inPot = [];
+  steps.slice(0, cur + 1).forEach((t) => { if (stepMode(t) !== "prep") stepIngr(t).forEach((c) => { if (!inPot.includes(c)) inPot.push(c); }); });
+  let seed = 7;
+  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  if (inPot.length) {
+    const levels = Math.min(4, 1 + Math.floor(inPot.length / 2));
+    const colors = inPot.flat();
+    for (let lv = 0; lv < levels; lv++)
+      for (let x = 57 + lv * 2; x <= 71 - lv * 2; x++) px(pot, x, 13 - lv, colors[Math.floor(rnd() * colors.length)]);
+  } else if (mode === "heat") {  // just oil / water heating up
+    const water = /water|boil/i.test(steps[cur]);
+    for (let x = 57; x <= 71; x += 2) px(pot, x, 13, water ? "#8fd0dc" : "#ffe08a");
+  }
+  if (mode === "prep") {
+    const pieces = stepIngr(steps[cur]).flat();
+    const cols = pieces.length ? pieces : ["#9cc27a", "#5f8a45"];
+    for (let i = 0; i < 6; i++) px(board, 86 + i * 2 + (i % 2), 22 - (i % 2), cols[i % cols.length], 2);
+  }
+}
+function chefIdleText() {
+  if (!recipe) return onboarding ? "Any allergies or foods you avoid?" : "Snap your fridge and let's cook!";
+  return "";
+}
+function setChef(state, text) {
+  if (typeof finishOpen === "function" && finishOpen() && state !== "celebrate") state = "celebrate";  // keep cheering during the ending
+  $("kitchen").dataset.chef = state;
+  const t = text ?? (state === "listening" ? "I'm listening…" : state === "thinking" ? "Hmm, let me think…"
+    : state === "speaking" ? ($("chat").lastChild?.firstChild?.textContent || "") : state === "celebrate" ? "Bon appétit!" : chefIdleText());
+  const b = $("chefBubble");
+  const short = t.length > 64 ? t.slice(0, 62) + "…" : t;
+  if (short !== b.textContent || b.hidden !== !short) {
+    b.textContent = short; b.hidden = !short;
+    b.style.animation = "none"; void b.offsetWidth; b.style.animation = "";
+  }
+}
+
+// ---------- Finish celebration ----------
+let recipeStartedAt = 0;
+function playJingle() {  // tiny 8-bit fanfare with WebAudio square waves
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [[523, 0], [659, .12], [784, .24], [1047, .36], [784, .54], [1047, .66]];
+    notes.forEach(([f, t], i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "square"; o.frequency.value = f;
+      const start = ctx.currentTime + t, len = i === notes.length - 1 ? .45 : .11;
+      g.gain.setValueAtTime(.08, start); g.gain.exponentialRampToValueAtTime(.001, start + len);
+      o.connect(g).connect(ctx.destination); o.start(start); o.stop(start + len + .02);
+    });
+    setTimeout(() => ctx.close(), 1600);
+  } catch { /* no audio: animation still plays */ }
+}
+function confetti(n = 80) {
+  const colors = ["#e2553b", "#f6c453", "#9cc27a", "#8fd0dc", "#f08a6f", "#fff6e3"];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement("i"), size = 8 + Math.floor(Math.random() * 3) * 4;
+    c.className = "confetti";
+    Object.assign(c.style, { left: Math.random() * 100 + "vw", width: size + "px", height: size + "px",
+      background: colors[i % colors.length], boxShadow: "0 0 0 2px #3b2418",
+      animationDuration: 2.4 + Math.random() * 2.4 + "s", animationDelay: Math.random() * .8 + "s",
+      animationTimingFunction: "steps(24)" });
+    c.style.setProperty("--dx", (Math.random() * 160 - 80) + "px");
+    c.style.setProperty("--rot", (Math.floor(Math.random() * 8) * 90) + "deg");
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 6000);
+  }
+}
+async function celebrate(audioB64) {
+  if (!recipe) return;
+  const mins = Math.max(1, Math.round((Date.now() - recipeStartedAt) / 60000));
+  let prefs = 0;
+  try { prefs = Object.values((await api("/preferences")).current).flat().length; } catch {}
+  $("finishDish").textContent = "Your " + recipe.dish + " is ready";
+  $("finishStats").innerHTML = "";
+  [`⏱ ${mins} min`, `📋 ${recipe.steps.length} steps`, `🧠 ${prefs} preference${prefs === 1 ? "" : "s"} respected`].forEach((t) => {
+    const sp = document.createElement("span"); sp.textContent = t; $("finishStats").appendChild(sp);
+  });
+  $("finishCard").style.animation = "none"; void $("finishCard").offsetWidth; $("finishCard").style.animation = "";
+  $("finish").classList.add("on");
+  updateKitchen(true);
+  setChef("celebrate", "Bon appétit!");
+  playJingle();
+  confetti();
+  setTimeout(() => playAudio(audioB64), 1100);  // "Enjoy your meal" after the jingle
+}
+const finishOpen = () => $("finish").classList.contains("on");
+function closeFinish() { $("finish").classList.remove("on"); setChef("idle"); }
+$("finishClose").addEventListener("click", closeFinish);
+$("doneBtn").addEventListener("click", gestureNext);  // same as 👌 on the last step
+$("finish").addEventListener("click", (e) => { if (e.target === $("finish")) closeFinish(); });
+$("finishNew").addEventListener("click", () => { closeFinish(); $("resetBtn").click(); });
+
+// ---------- Hands-free gestures (MediaPipe GestureRecognizer, runs in the browser) ----------
+// 👌 OK -> next step, ✋ open palm -> start recording, ✊ fist -> stop + send.
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+const MODEL = "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
+const HOLD_FRAMES = 6, COOLDOWN_MS = 1500;  // gesture must be steady ~0.4s; then pause before the next one
+let recognizer = null, camStream = null, camOn = false, lastVideoTime = -1, lastFrameAt = 0;
+let gStreak = { name: null, n: 0 }, gCooldownUntil = 0;
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// MediaPipe has no built-in "OK" gesture: thumb tip touches index tip, other three fingers extended
+function isOk(lm) {
+  const size = dist(lm[0], lm[9]);
+  const extended = (tip, pip) => dist(lm[0], lm[tip]) > dist(lm[0], lm[pip]) * 1.15;
+  return dist(lm[4], lm[8]) < size * 0.35 && extended(12, 10) && extended(16, 14) && extended(20, 18);
+}
+function classify(res) {
+  const lm = res.landmarks?.[0];
+  if (!lm) return null;
+  if (isOk(lm)) return "ok";
+  const g = res.gestures?.[0]?.[0];
+  if (g && g.score > 0.6) return { Open_Palm: "palm", Closed_Fist: "fist" }[g.categoryName] || null;
+  return null;
+}
+const G_LABEL = { ok: "👌 OK", palm: "✋ Open hand", fist: "✊ Fist" };
+
+async function gestureNext() {
+  if (busy || !recipe) return;
+  busy = true; $("talkBtn").disabled = true;
+  player.pause();
+  vstatus("Thinking…", "thinking");
+  const mySession = session;
+  try {
+    const data = await api("/next", { method: "POST" });
+    if (mySession !== session) return;
+    addBubble("user", "👌 (next step)");
+    addBubble("bot", data.reply);
+    if (data.current_step !== currentStep) { currentStep = data.current_step; render(); }
+    if (data.finished) celebrate(data.audio_url || data.audio_base64); else playAudio(data.audio_url || data.audio_base64);
+  } catch (err) { idle(); toast(err.message); }
+  finally { busy = false; $("talkBtn").disabled = false; }
+}
+
+function fire(name) {
+  const recording = recorder?.state === "recording";
+  if (name === "ok" && finishOpen()) closeFinish();
+  else if (name === "ok" && !recording) gestureNext();
+  else if (name === "palm" && !recording) startRec(true);
+  else if (name === "fist" && recording) stopRec();
+  else return false;
+  return true;
+}
+
+function onFrame() {
+  if (!camOn) return;
+  const v = $("camVideo"), now = performance.now();
+  if (now - lastFrameAt > 66 && v.readyState >= 2 && v.currentTime !== lastVideoTime) {  // ~15 fps
+    lastFrameAt = now; lastVideoTime = v.currentTime;
+    const name = classify(recognizer.recognizeForVideo(v, now));
+    gStreak = name === gStreak.name ? { name, n: gStreak.n + 1 } : { name, n: 1 };
+    const cooling = now < gCooldownUntil;
+    $("camLabel").textContent = name ? G_LABEL[name] + (cooling ? " (wait)" : "") : (cooling ? "…" : "Show a gesture");
+    $("camLabel").className = "";
+    $("camBarFill").style.width = name && !cooling ? Math.min(100, gStreak.n / HOLD_FRAMES * 100) + "%" : "0";
+    if (name && !cooling && gStreak.n >= HOLD_FRAMES && fire(name)) {
+      gCooldownUntil = now + COOLDOWN_MS;
+      gStreak = { name: null, n: 0 };
+      $("camLabel").textContent = G_LABEL[name] + " ✓"; $("camLabel").className = "fire";
+    }
+  }
+  requestAnimationFrame(onFrame);
+}
+
+async function startGestures() {
+  $("cam").classList.add("on");
+  $("camLabel").textContent = "Loading hand model…";
+  try {
+    if (!recognizer) {
+      const { GestureRecognizer, FilesetResolver } = await import(MP + "/vision_bundle.mjs");
+      const fileset = await FilesetResolver.forVisionTasks(MP + "/wasm");
+      recognizer = await GestureRecognizer.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL, delegate: "GPU" }, runningMode: "VIDEO", numHands: 1,
+      });
+    }
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+    $("camVideo").srcObject = camStream;
+    await $("camVideo").play();
+    camOn = true;
+    document.body.classList.add("cam-on");
+    $("gestureBtn").textContent = "✋ Gestures: on";
+    requestAnimationFrame(onFrame);
+  } catch (err) {
+    stopGestures();
+    toast("Gesture control unavailable: " + err.message);
+  }
+}
+
+function stopGestures() {
+  camOn = false;
+  camStream?.getTracks().forEach((t) => t.stop());
+  camStream = null;
+  $("cam").classList.remove("on");
+  document.body.classList.remove("cam-on");
+  $("gestureBtn").textContent = "✋ Gestures: off";
+}
+
+$("gestureBtn").addEventListener("click", () => (camOn ? stopGestures() : startGestures()));
+
+const btn = $("talkBtn");
+btn.addEventListener("pointerdown", (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); startRec(); });
+btn.addEventListener("pointerup", stopRec);
+btn.addEventListener("pointercancel", stopRec);
+btn.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !e.repeat) { e.preventDefault(); startRec(); }
+});
+document.addEventListener("keyup", (e) => { if (e.code === "Space") { e.preventDefault(); stopRec(); } });
+
+// ---------- Demo mode (/#demo, /#demo-done): sample session without calling any API, for screenshots ----------
+if (location.hash.startsWith("#demo")) {
+  recipe = { dish: "Cheesy Chicken & Veggie Fried Rice", why: "Uses the chicken, rice, eggs and veggies already in your fridge, peanut-free.",
+    ingredients: ["2 cups cooked rice", "1 chicken drumstick, shredded", "2 eggs", "1 carrot, diced", "1/2 onion, diced",
+                  "2 cloves garlic", "1 cup broccoli florets", "1 tbsp butter", "Handful of grated cheese", "Salt, pepper, lemon"],
+    steps: ["Shred the chicken and dice the onion, carrot and broccoli.", "Heat a splash of oil in a large pan over medium-high heat.",
+            "Cook the onion, carrot and broccoli for four minutes.", "Push veggies aside, crack in the eggs and scramble until just set.",
+            "Add the rice and chicken, then stir-fry for three minutes.", "Season with salt, pepper and a squeeze of lemon.",
+            "Serve hot, topped with a little grated cheese."] };
+  currentStep = 4; shownRecipe = recipe; render();
+  addBubble("user", "I'm allergic to peanuts.");
+  addBubble("bot", "Got it, I'll keep peanuts out of everything we cook.", { person: "me", fact: "allergic to peanuts" });
+  addBubble("user", "Done, what's next?");
+  addBubble("bot", "Nice! Now add the rice and chicken, then stir-fry for three minutes.");
+  document.querySelectorAll("#chat .bubble.bot").forEach((b) => { const s = document.createElement("span"); s.className = "badge pass"; s.textContent = "✅ Checked against 1 preference"; b.appendChild(s); });
+  setChef("speaking", "Now add the rice and chicken, then stir-fry!");
+  if (location.hash === "#demo-done") { currentStep = recipe.steps.length - 1; render(); recipeStartedAt = Date.now() - 18 * 60000; celebrate(null); }
+}
+</script>
+</body>
+</html>
